@@ -7,6 +7,9 @@ SHELL = cmd.exe
 CG_TOOL_ROOT := C:/ti/ccsv6/tools/compiler/ti-cgt-msp430_4.4.3
 
 ORDERED_OBJS += \
+"./IObuffer.obj" \
+"./ft201x.obj" \
+"./i2c.obj" \
 "./main.obj" \
 "../lnk_msp430fr5738.cmd" \
 $(GEN_CMDS__FLAG) \
@@ -147,8 +150,8 @@ NewBerryMaster.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)$(BIN_OUTPUTS__QUOTED)
-	-$(RM) "main.pp" 
-	-$(RM) "main.obj" 
+	-$(RM) "IObuffer.pp" "ft201x.pp" "i2c.pp" "main.pp" 
+	-$(RM) "IObuffer.obj" "ft201x.obj" "i2c.obj" "main.obj" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

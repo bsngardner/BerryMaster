@@ -8,14 +8,15 @@
 #ifndef IOBUFFER_H_
 #define IOBUFFER_H_
 
-typedef struct
-{
+typedef struct {
 	char* buffer;				// pointer to actual buffer in memory
 	int size;					// maximum capacity -- size of buffer
 	int tail_dex;				// index of oldest data = index to read from
 	int count;					// number of bytes in buffer
 	void (*bytes_ready)(void);	// callback to wake up writer
-} IObuffer;	// 10 bytes...
+	unsigned int fit_block :1;
+	unsigned int blocking_write :1;
+} IObuffer;
 
 // TODO: Does this (or its declarations) need to be volatile?
 

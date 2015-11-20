@@ -6,12 +6,10 @@
  */
 
 #include <stdlib.h>
-#include "BDL.h"
 #include "IObuffer.h"
 
 // Write one character to the buffer
-int IOputc(char c, IObuffer* iob)
-{
+int IOputc(char c, IObuffer* iob) {
 	int head_dex; // This might be cached for more speed...
 
 	// Return error if buffer is null or inactive or full
@@ -20,6 +18,7 @@ int IOputc(char c, IObuffer* iob)
 	// TODO: check for null buffer? (Ouch 6/20/2015)
 
 	// Disable interrupts for interrupt-driven IO
+
 	__disable_interrupt();
 
 	// Get pointer for write location and write to it
@@ -41,8 +40,7 @@ int IOputc(char c, IObuffer* iob)
 }
 
 // Write a C string to the buffer (null terminated!)
-int IOputs(const char* s, IObuffer* iob)
-{
+int IOputs(const char* s, IObuffer* iob) {
 	int space_left,		// bytes left to EITHER end of buffer or overflow
 			byte_count = 0;		// bytes written
 	char* write_ptr;	// pointer to which to copy
@@ -52,6 +50,7 @@ int IOputs(const char* s, IObuffer* iob)
 	if (!iob || !iob->size || (iob->size - iob->count <= 0))
 		return -1; // error
 
+	__disable_interrupt();
 	// Use space_left as an intermediate variable
 	space_left = iob->tail_dex + iob->count;				// index of head
 	if (space_left >= iob->size)
@@ -64,13 +63,10 @@ int IOputs(const char* s, IObuffer* iob)
 	space_left = iob->size - space_left;
 
 	// Disable interrupts for interrupt-driven IO
-	__disable_interrupt();
 
 	// If the space from the head to the wrap is empty, write to that
-	if (space_left < (iob->size - iob->count))
-	{
-		while (--space_left)
-		{
+	if (space_left < (iob->size - iob->count)) {
+		while (space_left--) {
 			c = *s++;	// copy from string
 			if (c)
 				byte_count++, *write_ptr++ = c;
@@ -79,12 +75,14 @@ int IOputs(const char* s, IObuffer* iob)
 		}
 	}
 
+	// Reset write_ptr to the beginning if we used the first loop
+	if (space_left <= 0)
+		write_ptr = iob->buffer;
+	space_left = iob->size - iob->count - byte_count;
+
 	// Write until buffer is full (either after wrap or having skipped it)
-	space_left = iob->size - iob->count;
-	if (c)
-	{
-		while (--space_left)
-		{
+	if (c) {
+		while (space_left--) {
 			c = *s++;	// copy from string
 			if (c)
 				byte_count++, *write_ptr++ = c;
@@ -94,23 +92,31 @@ int IOputs(const char* s, IObuffer* iob)
 	}
 
 	// Alert the writer (could be if buffer was empty)
-	if (/*!iob->count &&*/iob->bytes_ready)
+	if (!iob->count && iob->bytes_ready)
 		iob->bytes_ready();
 
 	// Increment IObuffer count
-	iob->count += byte_count;
+
+	if ((!c || !iob->fit_block))
+		iob->count += byte_count;
+	else
+		__no_operation();
 
 	__enable_interrupt();
 	// Could optionally check if more space has been made available (interrupts)
 
 	// Return byte count, or -1 if the full string was not copied
-	return c ? -1 : byte_count;
+	return c ? -byte_count : byte_count;
 	// then maybe check if more space is available (interrupts)
 }
 
+//Unfinished, not declared in .h
+int IOputnbytes(const char* s, int n, IObuffer* iob) {
+	return 0;
+}
+
 // Get a character out of the buffer
-int IOgetc(char* cp, IObuffer *iob)
-{
+int IOgetc(char* cp, IObuffer *iob) {
 	// Return error if buffer is null or inactive or empty or if cp is null
 	if (!iob || !iob->size || !iob->count || !cp)
 		return -1; // error
@@ -127,8 +133,7 @@ int IOgetc(char* cp, IObuffer *iob)
 	return 0;
 }
 
-IObuffer* IObuffer_create(int size)
-{
+IObuffer* IObuffer_create(int size) {
 	// Minimum size of 1
 	if (size <= 0)
 		return 0;
@@ -152,8 +157,7 @@ IObuffer* IObuffer_create(int size)
 	return iob;
 }
 
-void IObuffer_init(IObuffer* iob, char* buffer, int size, void(*cb)(void))
-{
+void IObuffer_init(IObuffer* iob, char* buffer, int size, void (*cb)(void)) {
 	iob->buffer = buffer;
 	iob->tail_dex = 0;
 	iob->count = 0;
@@ -161,10 +165,8 @@ void IObuffer_init(IObuffer* iob, char* buffer, int size, void(*cb)(void))
 	iob->bytes_ready = cb;
 }
 
-void IObuffer_destroy(IObuffer* iob)
-{
-	if (iob)
-	{
+void IObuffer_destroy(IObuffer* iob) {
+	if (iob) {
 		if (iob->buffer)
 			free(iob->buffer);
 		free(iob);
