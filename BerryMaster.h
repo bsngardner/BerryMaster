@@ -53,7 +53,7 @@
 #define INT1 0x02
 #define BCLK 0x04
 #define SW1  0x08
-// pin 1.4 (0x10) unused
+#define USBINT 0x10 // USB interrupt
 #define SCLK 0x20
 #define SDA  0x40
 #define SCL  0x80
@@ -70,7 +70,7 @@
 
 // System errors
 enum SYS_ERRORS {
-	SYS_ERR_430init = 1,		// 1 eZ430X initialize
+	SYS_ERR_430init = 1,	// 1 eZ430X initialize
 	SYS_ERR_USCB_RX,		// 2 USCB receive timeout
 	SYS_ERR_I2C_TO,			// 3 i2c timeout
 	SYS_ERR_I2C_ACK,		// 4 i2c ACK timeout
@@ -87,7 +87,8 @@ enum SYS_ERRORS {
 #define MAX_MSG_LENGTH 64
 
 // Events
-#define USB_IO_EVENT 0x01
-#define WRITE_DEBUG_EVENT 0x02
+#define USB_I_EVENT 0x01
+#define USB_O_EVENT 0x02
+#define WRITE_DEBUG_EVENT 0x04
 
 #endif /* BERRYMASTER_H_ */
