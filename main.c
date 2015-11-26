@@ -8,15 +8,15 @@
  *
  * Pinout:
  * Pin#	Dir	Part		Pin#		Dir	Part
- * Xin		Xin		|	2.4/A7		I	MIBO
- * Xout		Xout	| 	2.3			O	MOBI
+ * Xin		Xin		|	2.4/A7		I	MIBO (Master in Berry out)
+ * Xout		Xout	| 	2.3			O	MOBI (Master out Berry in)
  * AVSS		GND		|	DVCC		X	VDD
  * AVCC		VDD		|	DVSS		X	Gnd
  * 1.0	I	Int0	|	VCore		X	X
  * 1.1	I	Int1	|	1.7/UCB0SCL	O	SCL
  * 1.2	O	BCLK	|	1.6/UCB0SDA	X	SDA
  * 1.3	I	SW1		|	2.2			I	BCHG
- * 1.4	?	??		|	2.1/UCA0RX0	I	MISO
+ * 1.4	I	USBInt	|	2.1/UCA0RX0	I	MISO
  * 1.5	O	SCLK	|	2.0/UCA0TX0	O	MOSI
  * J.0	O	LED0	|	Rst			I	Rst
  * J.1	O	LED1	|	Test			Test
@@ -37,7 +37,7 @@
 // Macros
 #define WDT_CLKS_PER_SEC	512				// 512 Hz WD clock (@32 kHz)
 #define WDT_CTL				WDT_ADLY_1_9	// 1.95 ms
-#define USB_IN_CNT			51				// ~10 ms using WDT
+#define DEBOUNCE_CNT		20
 
 // Local function prototypes
 static int WDT_init();
@@ -46,7 +46,7 @@ static int msp430init();
 
 // Global Variables
 static volatile int WDT_cps_cnt;
-static volatile int USBInCnt;
+static volatile int debounceCnt;
 volatile uint16_t sys_event;
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
@@ -131,25 +131,33 @@ static int WDT_init() {
 	SFRIE1 |= WDTIE; // Enable WDT interrupt
 
 	WDT_cps_cnt = WDT_CLKS_PER_SEC;	// set WD 1 second counter
-	USBInCnt = USB_IN_CNT*2; // set interval to poll USB Input
 	return 0;
 }
 
 // Initialize ports, timers, clock, etc. for the msp430
 static int msp430init() {
 	WDT_init(); // init the watchdog timer
-	setClock(); // init the clock
 
 	// Initialize Port 1
 	P1SEL0 = P1SEL1 = 0; // Port 1 is GPIO
+	P1DIR = (BCLK | SCLK | SCL); // output pins = 1; input = 0
+	// Init button interrupt on port 1:
+	P1REN = SW1 | USBINT; // pull-up resistors on switch1 and USBINT
+	P1IE = SW1 | USBINT; // enable interrupt for sw1 and usb
+	P1IES = SW1 | USBINT; // interrupt on falling edge
 
-    // Initialize LED output pins.
-    PJDIR |= LED0 | LED1; // set direction to output (high)
-    PJOUT |= LED0; // LED0 on
-    PJOUT &= ~LED1; // LED1 off
+	// TODO: Initialize Port 2
 
-    // Initialize the USB comm chip - ft201x
-    ft201x_init();
+	// Initialize Port J
+	PJSEL0 &= ~0x0f; // first 4 pins are GPIO (J.4 and J.5 are crystal pins)
+	PJSEL1 &= ~0x0f; // GPIO
+	PJOUT &= ~0x0f; // all pins low
+	PJREN &= ~0x0f; // no pull-up resistors
+    PJDIR = LED0 | LED1 | ASDA | ASCL; // set LED pins and ASDA/ASCL as output
+    LED0_OFF; // LED0 off
+    LED1_OFF; // LED1 off
+	setClock(); // init the clock (also on port J)
+    ft201x_init(); // Initialize the USB comm chip (ft201x)
 
     // Enable global interrupts
     __enable_interrupt();
@@ -170,18 +178,20 @@ __interrupt void WDT_ISR(void) {
 		WDT_cps_cnt = WDT_CLKS_PER_SEC;
 		LED0_TOGGLE; // toggle heartbeat LED
 
-		// Signal write-debug event just for fun. Wake up to service it.
+//		// Signal write-debug event just for fun. Wake up to service it.
 //    	sys_event |= WRITE_DEBUG_EVENT;
 //    	__bic_SR_register_on_exit(LPM0_bits);
 	}
 
-	// 1/10th second elapsed
-//	--USBInCnt;
-//	if (USBInCnt == 0) {
-//		USBInCnt = USB_IN_CNT*2;
-//		sys_event |= USB_I_EVENT;
-//
-//	}
+	// Are we currently debouncing the switch?
+	if (debounceCnt) {
+		// Yes; are we finished?
+		if (--debounceCnt == 0) {
+			// TODO: Signal button event. Remove toggling the LED.
+			LED1_TOGGLE;
+		}
+	}
+
 }
 
 //-----------------------------------------------------------------------------
@@ -195,25 +205,30 @@ __interrupt void Port_1_ISR(void)
 		// Clear the pending interrupt.
 		P1IFG &= ~USBINT;
 
-		IOputc('a', io_usb_out);
-		IOputc('\r', io_usb_out);
-		IOputc(0, io_usb_out);
+		// Signal write-debug event just for fun. Wake up to service it.
+    	sys_event |= WRITE_DEBUG_EVENT;
+    	__bic_SR_register_on_exit(LPM0_bits);
 
-		LED1_TOGGLE;
+
+//		IOputc('a', io_usb_out);
+//		IOputc('\r', io_usb_out);
+//		IOputc(0, io_usb_out);
+
+//		LED1_TOGGLE;
 
 		// Signal USB input event
-		sys_event |= USB_I_EVENT;
+//		sys_event |= USB_I_EVENT;
 
 		// Wake up the processor
-		__bic_SR_register_on_exit(LPM0_bits);
+//		__bic_SR_register_on_exit(LPM0_bits);
 
 	}
 
 	// Switch1 interrupt?
-//	if (P1IFG & SW1) {
-//		WDT_debounce_cnt = DEBOUNCE_CNT;
-//		P1IFG &= ~SW1;
-//	}
+	if (P1IFG & SW1) {
+		debounceCnt = DEBOUNCE_CNT;
+		P1IFG &= ~SW1;
+	}
 
 	// Radio interrupt?
 //	if (P1IFG & INT) {

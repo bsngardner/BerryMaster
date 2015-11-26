@@ -74,23 +74,6 @@ void USB_In_callback() {
 //	Right now this just sets up the ports, nothing else...
 //
 int ft201x_init() {
-#if defined(MAMA_REV_A)
-	// set sclk and sdata pins for the ft201x (i2c)
-	PJSEL0 &= ~(ASDA & ASCL);
-	PJSEL1 &= ~(ASDA & ASCL);
-	PJOUT &= ~(ASDA & ASCL);
-	PJDIR &= ~(ASDA & ASCL);
-
-	// set interrupt pin (1.4) as input with pull-up resistor
-	// set pull-up high; falling edge interrupt
-	P1DIR &= ~USBINT; // 0 is input
-	P1REN |= USBINT; // pull-up resistor.
-	P1IE |= USBINT; // Enable interrupt for this pin.
-	P1IES |= USBINT; // Interrupt on falling edge
-
-#else
-#error 665
-#endif
 
 	// Create an output buffer to send to host
 	io_usb_out = IObuffer_create(MAX_MSG_LENGTH);
@@ -105,7 +88,7 @@ int ft201x_init() {
 	return 0;
 }
 
-//TODO: There should be an init, open, and close--or really an open and close
+// TODO: There should be an init, open, and close--or really an open and close
 // and let the BDL_init take care of the ports.
 
 //*****************************************************************************
