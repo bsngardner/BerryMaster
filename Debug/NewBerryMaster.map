@@ -1,10 +1,10 @@
 ******************************************************************************
                   MSP430 Linker PC v4.4.3                      
 ******************************************************************************
->> Linked Wed Nov 25 17:25:54 2015
+>> Linked Wed Dec 02 17:35:10 2015
 
 OUTPUT FILE NAME:   <NewBerryMaster.out>
-ENTRY POINT SYMBOL: "_c_int00_noargs_noexit"  address: 0000ce80
+ENTRY POINT SYMBOL: "_c_int00_noargs_noexit"  address: 0000d150
 
 
 MEMORY CONFIGURATION
@@ -16,8 +16,8 @@ MEMORY CONFIGURATION
   PERIPHERALS_16BIT     00000100   00000100  00000000  00000100  RWIX
   INFOB                 00001800   00000080  00000000  00000080  RWIX
   INFOA                 00001880   00000080  00000000  00000080  RWIX
-  RAM                   00001c00   00000400  00000180  00000280  RWIX
-  FRAM                  0000c200   00003d80  00000cd0  000030b0  RWIX
+  RAM                   00001c00   00000400  00000184  0000027c  RWIX
+  FRAM                  0000c200   00003d80  00000f98  00002de8  RWIX
   JTAGSIGNATURE         0000ff80   00000004  00000004  00000000  RWIX  ffff 
   BSLSIGNATURE          0000ff84   00000004  00000004  00000000  RWIX  ffff 
   IPESIGNATURE          0000ff88   00000008  00000008  00000000  RWIX  ffff 
@@ -84,22 +84,24 @@ SECTION ALLOCATION MAP
  output                                  attributes/
 section   page    origin      length       input sections
 --------  ----  ----------  ----------   ----------------
-.bss       0    00001c00    00000036     UNINITIALIZED
+.bss       0    00001c00    0000003a     UNINITIALIZED
                   00001c00    00000024     (.common:usb_i2c_context)
                   00001c24    00000002     (.common:WDT_cps_cnt)
                   00001c26    00000002     (.common:debounceCnt)
-                  00001c28    00000002     (.common:i2c_fSCL)
-                  00001c2a    00000002     (.common:io_usb_in)
-                  00001c2c    00000002     (.common:io_usb_out)
-                  00001c2e    00000002     (.common:memsize)
-                  00001c30    00000002     (.common:sys_base)
-                  00001c32    00000002     (.common:sys_event)
-                  00001c34    00000002     (.common:sys_free)
+                  00001c28    00000002     (.common:i2c_delay)
+                  00001c2a    00000002     (.common:i2c_fSCL)
+                  00001c2c    00000002     (.common:io_usb_in)
+                  00001c2e    00000002     (.common:io_usb_out)
+                  00001c30    00000002     (.common:memsize)
+                  00001c32    00000002     (.common:sys_base)
+                  00001c34    00000002     (.common:sys_event)
+                  00001c36    00000002     (.common:sys_free)
+                  00001c38    00000002     (.common:usb_poll_cnt)
 
-.data      0    00001c36    0000000a     UNINITIALIZED
-                  00001c36    00000004     rts430x_lc_sd_eabi.lib : _lock.obj (.data:_lock)
-                  00001c3a    00000004                            : _lock.obj (.data:_unlock)
-                  00001c3e    00000002                            : memory.obj (.data)
+.data      0    00001c3a    0000000a     UNINITIALIZED
+                  00001c3a    00000004     rts430x_lc_sd_eabi.lib : _lock.obj (.data:_lock)
+                  00001c3e    00000004                            : _lock.obj (.data:_unlock)
+                  00001c42    00000002                            : memory.obj (.data)
 
 .stack     0    00001ec0    00000140     UNINITIALIZED
                   00001ec0    00000002     rts430x_lc_sd_eabi.lib : boot.obj (.stack)
@@ -131,42 +133,48 @@ section   page    origin      length       input sections
 .mspabi.extab 
 *          0    0000c434    00000000     UNINITIALIZED
 
-.const     0    0000c434    0000000e     
-                  0000c434    0000000e     main.obj (.const:.string)
+.const     0    0000c434    00000010     
+                  0000c434    00000010     main.obj (.const:.string)
 
-.text      0    0000c600    000008d0     
-                  0000c600    000000d6     IObuffer.obj (.text:IOputs)
-                  0000c6d6    000000d6     rts430x_lc_sd_eabi.lib : copy_decompress_rle.obj (.text:__TI_decompress_rle_core)
-                  0000c7ac    000000ac                            : memory.obj (.text:malloc)
-                  0000c858    000000a4     ft201x.obj (.text:ft201x_i2c_read)
-                  0000c8fc    00000080     rts430x_lc_sd_eabi.lib : autoinit_wdt.obj (.text:_auto_init_hold_wdt)
-                  0000c97c    00000062     main.obj (.text:main)
-                  0000c9de    0000005e     rts430x_lc_sd_eabi.lib : setjmp.obj (.text)
-                  0000ca3c    0000005c     ft201x.obj (.text:ft201x_i2c_out8bits)
-                  0000ca98    0000005a     main.obj (.text:msp430init)
-                  0000caf2    00000056     IObuffer.obj (.text:IOputc)
-                  0000cb48    0000004e     ft201x.obj (.text:ft201x_i2c_write)
-                  0000cb96    0000004a     IObuffer.obj (.text:IObuffer_create)
-                  0000cbe0    00000046     main.obj (.text:setClock)
-                  0000cc26    00000044     ft201x.obj (.text:USBOutEvent)
-                  0000cc6a    00000040     rts430x_lc_sd_eabi.lib : cpy_util.obj (.text:__memcpy_far)
-                  0000ccaa    0000003e                            : copy_zero_init.obj (.text:decompress:ZI:__TI_zero_init)
-                  0000cce8    0000003c     IObuffer.obj (.text:IOgetc)
-                  0000cd24    0000003c     ft201x.obj (.text:USBInEvent)
-                  0000cd60    0000003c     rts430x_lc_sd_eabi.lib : copy_decompress_none.obj (.text:decompress:none:__TI_decompress_none)
-                  0000cd9c    00000038                            : memory.obj (.text:minit)
-                  0000cdd4    0000002e     main.obj (.text:_isr:WDT_ISR)
-                  0000ce02    0000002a     main.obj (.text:_isr:Port_1_ISR)
-                  0000ce2c    0000002a     ft201x.obj (.text:ft201x_i2c_start_address)
-                  0000ce56    0000002a     ft201x.obj (.text:ft201x_init)
-                  0000ce80    0000001a     rts430x_lc_sd_eabi.lib : boot_special.obj (.text:_isr:_c_int00_noargs_noexit)
-                  0000ce9a    00000012     main.obj (.text:WDT_init)
-                  0000ceac    0000000e     rts430x_lc_sd_eabi.lib : copy_decompress_rle.obj (.text:decompress:rle24:__TI_decompress_rle24)
-                  0000ceba    00000006     ft201x.obj (.text:USB_Out_callback)
-                  0000cec0    00000006     rts430x_lc_sd_eabi.lib : isr_trap.obj (.text:_isr:__TI_ISR_TRAP)
-                  0000cec6    00000004                            : pre_init.obj (.text:_system_pre_init)
-                  0000ceca    00000004                            : exit.obj (.text:abort)
-                  0000cece    00000002                            : _lock.obj (.text:_nop)
+.text      0    0000c600    00000b98     
+                  0000c600    0000019c     main.obj (.text:ERROR2)
+                  0000c79c    000000d6     IObuffer.obj (.text:IOputs)
+                  0000c872    000000d6     rts430x_lc_sd_eabi.lib : copy_decompress_rle.obj (.text:__TI_decompress_rle_core)
+                  0000c948    000000ac                            : memory.obj (.text:malloc)
+                  0000c9f4    000000a4     ft201x.obj (.text:ft201x_i2c_read)
+                  0000ca98    00000080     rts430x_lc_sd_eabi.lib : autoinit_wdt.obj (.text:_auto_init_hold_wdt)
+                  0000cb18    00000074     main.obj (.text:msp430init)
+                  0000cb8c    00000070     main.obj (.text:main)
+                  0000cbfc    0000005e     rts430x_lc_sd_eabi.lib : setjmp.obj (.text)
+                  0000cc5a    0000005c     ft201x.obj (.text:ft201x_i2c_out8bits)
+                  0000ccb6    0000005c     ft201x.obj (.text:ft201x_init)
+                  0000cd12    00000056     IObuffer.obj (.text:IOputc)
+                  0000cd68    0000004e     ft201x.obj (.text:ft201x_i2c_write)
+                  0000cdb6    0000004a     IObuffer.obj (.text:IObuffer_create)
+                  0000ce00    00000048     main.obj (.text:setClock)
+                  0000ce48    00000044     ft201x.obj (.text:USBOutEvent)
+                  0000ce8c    00000044     main.obj (.text:_isr:WDT_ISR)
+                  0000ced0    00000040     ft201x.obj (.text:USBInEvent)
+                  0000cf10    00000040     rts430x_lc_sd_eabi.lib : cpy_util.obj (.text:__memcpy_far)
+                  0000cf50    0000003e                            : copy_zero_init.obj (.text:decompress:ZI:__TI_zero_init)
+                  0000cf8e    0000003c     IObuffer.obj (.text:IOgetc)
+                  0000cfca    0000003c     rts430x_lc_sd_eabi.lib : copy_decompress_none.obj (.text:decompress:none:__TI_decompress_none)
+                  0000d006    00000038                            : memory.obj (.text:minit)
+                  0000d03e    00000034     i2c.obj (.text:i2c_out_stop)
+                  0000d072    0000002a     main.obj (.text:_isr:Port_1_ISR)
+                  0000d09c    0000002a     ft201x.obj (.text:ft201x_i2c_start_address)
+                  0000d0c6    00000026     i2c.obj (.text:i2c_clockhigh)
+                  0000d0ec    00000026     i2c.obj (.text:i2c_clocklow)
+                  0000d112    00000024     i2c.obj (.text:i2c_init)
+                  0000d136    0000001a     main.obj (.text:WDT_init)
+                  0000d150    0000001a     rts430x_lc_sd_eabi.lib : boot_special.obj (.text:_isr:_c_int00_noargs_noexit)
+                  0000d16a    0000000e                            : copy_decompress_rle.obj (.text:decompress:rle24:__TI_decompress_rle24)
+                  0000d178    0000000a     main.obj (.text:ERROR)
+                  0000d182    00000006     ft201x.obj (.text:USB_Out_callback)
+                  0000d188    00000006     rts430x_lc_sd_eabi.lib : isr_trap.obj (.text:_isr:__TI_ISR_TRAP)
+                  0000d18e    00000004                            : pre_init.obj (.text:_system_pre_init)
+                  0000d192    00000004                            : exit.obj (.text:abort)
+                  0000d196    00000002                            : _lock.obj (.text:_nop)
 
 $fill000   0    0000ff80    00000004     
                   0000ff80    00000004     --HOLE-- [fill = ffff]
@@ -241,8 +249,8 @@ SYSNMI     0    0000fffc    00000002
 LINKER GENERATED COPY TABLES
 
 __TI_cinit_table @ 0000c424 records: 2, size/record: 8, table size: 16
-	.data: load addr=0000c400, load size=00000010 bytes, run addr=00001c36, run size=0000000a bytes, compression=copy
-	.bss: load addr=0000c41e, load size=00000006 bytes, run addr=00001c00, run size=00000036 bytes, compression=zero_init
+	.data: load addr=0000c400, load size=00000010 bytes, run addr=00001c3a, run size=0000000a bytes, compression=copy
+	.bss: load addr=0000c41e, load size=00000006 bytes, run addr=00001c00, run size=0000003a bytes, compression=zero_init
 
 
 LINKER GENERATED HANDLER TABLE
@@ -289,7 +297,7 @@ address   name
 00000712  ADC10MEM0_L             
 000004be  BCD2BIN                 
 000004bc  BIN2BCD                 
-0000ceca  C$$EXIT                 
+0000d192  C$$EXIT                 
 000008c0  CDCTL0                  
 000008c1  CDCTL0_H                
 000008c0  CDCTL0_L                
@@ -389,6 +397,8 @@ address   name
 0000050e  DMAIV                   
 0000050f  DMAIV_H                 
 0000050e  DMAIV_L                 
+0000d178  ERROR                   
+0000c600  ERROR2                  
 00000140  FRCTL0                  
 00000141  FRCTL0_H                
 00000140  FRCTL0_L                
@@ -398,10 +408,10 @@ address   name
 00000146  GCCTL1                  
 00000147  GCCTL1_H                
 00000146  GCCTL1_L                
-0000cb96  IObuffer_create         
-0000cce8  IOgetc                  
-0000caf2  IOputc                  
-0000c600  IOputs                  
+0000cdb6  IObuffer_create         
+0000cf8e  IOgetc                  
+0000cd12  IOputc                  
+0000c79c  IOputs                  
 000004c4  MAC                     
 000004da  MAC32H                  
 000004db  MAC32H_H                
@@ -524,7 +534,7 @@ address   name
 0000012a  PMMIFG                  
 0000012b  PMMIFG_H                
 0000012a  PMMIFG_L                
-0000ce02  Port_1_ISR              
+0000d072  Port_1_ISR              
 000001b0  REFCTL0                 
 000001b1  REFCTL0_H               
 000001b0  REFCTL0_L               
@@ -734,13 +744,13 @@ address   name
 0000064e  UCB0TXBUF               
 0000064f  UCB0TXBUF_H             
 0000064e  UCB0TXBUF_L             
-0000cd24  USBInEvent              
-0000cc26  USBOutEvent             
-0000ceba  USB_Out_callback        
+0000ced0  USBInEvent              
+0000ce48  USBOutEvent             
+0000d182  USB_Out_callback        
 0000015c  WDTCTL                  
 0000015d  WDTCTL_H                
 0000015c  WDTCTL_L                
-0000cdd4  WDT_ISR                 
+0000ce8c  WDT_ISR                 
 00002000  __STACK_END             
 00000140  __STACK_SIZE            
 00000140  __SYSMEM_SIZE           
@@ -750,9 +760,9 @@ address   name
 0000c41e  __TI_Handler_Table_Limit
 UNDEFED   __TI_INITARRAY_Base     
 UNDEFED   __TI_INITARRAY_Limit    
-0000cec0  __TI_ISR_TRAP           
-0000cd60  __TI_decompress_none    
-0000ceac  __TI_decompress_rle24   
+0000d188  __TI_ISR_TRAP           
+0000cfca  __TI_decompress_none    
+0000d16a  __TI_decompress_rle24   
 0000ffce  __TI_int31              
 0000ffd8  __TI_int36              
 0000ffde  __TI_int39              
@@ -770,39 +780,44 @@ UNDEFED   __TI_INITARRAY_Limit
 0000fff8  __TI_int52              
 0000fffa  __TI_int53              
 0000fffc  __TI_int54              
-0000ccaa  __TI_zero_init          
+0000cf50  __TI_zero_init          
 ffffffff  __binit__               
 ffffffff  __c_args__              
-0000cc6a  __memcpy_far            
-0000c8fc  _auto_init_hold_wdt     
-0000ce80  _c_int00_noargs_noexit  
-00001c36  _lock                   
-0000cece  _nop                    
+0000cf10  __memcpy_far            
+0000ca98  _auto_init_hold_wdt     
+0000d150  _c_int00_noargs_noexit  
+00001c3a  _lock                   
+0000d196  _nop                    
 0000fffe  _reset_vector           
-0000c9de  _setjmp                 
+0000cbfc  _setjmp                 
 00001ec0  _stack                  
 0000c200  _sys_memory             
-0000cec6  _system_pre_init        
-00001c3a  _unlock                 
-0000ceca  abort                   
+0000d18e  _system_pre_init        
+00001c3e  _unlock                 
+0000d192  abort                   
 ffffffff  binit                   
 0000c400  fram_ro_start           
 0000c200  fram_rw_start           
 0000c600  fram_rx_start           
-0000ca3c  ft201x_i2c_out8bits     
-0000c858  ft201x_i2c_read         
-0000ce2c  ft201x_i2c_start_address
-0000cb48  ft201x_i2c_write        
-0000ce56  ft201x_init             
-00001c28  i2c_fSCL                
-00001c2a  io_usb_in               
-00001c2c  io_usb_out              
-0000ca0e  longjmp                 
-0000c97c  main                    
-0000c7ac  malloc                  
-0000cd9c  minit                   
-0000c9de  setjmp                  
-00001c32  sys_event               
+0000cc5a  ft201x_i2c_out8bits     
+0000c9f4  ft201x_i2c_read         
+0000d09c  ft201x_i2c_start_address
+0000cd68  ft201x_i2c_write        
+0000ccb6  ft201x_init             
+0000d0c6  i2c_clockhigh           
+0000d0ec  i2c_clocklow            
+00001c28  i2c_delay               
+00001c2a  i2c_fSCL                
+0000d112  i2c_init                
+0000d03e  i2c_out_stop            
+00001c2c  io_usb_in               
+00001c2e  io_usb_out              
+0000cc2c  longjmp                 
+0000cb8c  main                    
+0000c948  malloc                  
+0000d006  minit                   
+0000cbfc  setjmp                  
+00001c34  sys_event               
 00001c00  usb_i2c_context         
 
 
@@ -1287,12 +1302,13 @@ address   name
 000008ce  CDIV_L                  
 000008cf  CDIV_H                  
 00001c00  usb_i2c_context         
-00001c28  i2c_fSCL                
-00001c2a  io_usb_in               
-00001c2c  io_usb_out              
-00001c32  sys_event               
-00001c36  _lock                   
-00001c3a  _unlock                 
+00001c28  i2c_delay               
+00001c2a  i2c_fSCL                
+00001c2c  io_usb_in               
+00001c2e  io_usb_out              
+00001c34  sys_event               
+00001c3a  _lock                   
+00001c3e  _unlock                 
 00001ec0  _stack                  
 00002000  __STACK_END             
 0000c200  _sys_memory             
@@ -1302,38 +1318,44 @@ address   name
 0000c41e  __TI_Handler_Table_Limit
 0000c424  __TI_CINIT_Base         
 0000c434  __TI_CINIT_Limit        
-0000c600  IOputs                  
+0000c600  ERROR2                  
 0000c600  fram_rx_start           
-0000c7ac  malloc                  
-0000c858  ft201x_i2c_read         
-0000c8fc  _auto_init_hold_wdt     
-0000c97c  main                    
-0000c9de  _setjmp                 
-0000c9de  setjmp                  
-0000ca0e  longjmp                 
-0000ca3c  ft201x_i2c_out8bits     
-0000caf2  IOputc                  
-0000cb48  ft201x_i2c_write        
-0000cb96  IObuffer_create         
-0000cc26  USBOutEvent             
-0000cc6a  __memcpy_far            
-0000ccaa  __TI_zero_init          
-0000cce8  IOgetc                  
-0000cd24  USBInEvent              
-0000cd60  __TI_decompress_none    
-0000cd9c  minit                   
-0000cdd4  WDT_ISR                 
-0000ce02  Port_1_ISR              
-0000ce2c  ft201x_i2c_start_address
-0000ce56  ft201x_init             
-0000ce80  _c_int00_noargs_noexit  
-0000ceac  __TI_decompress_rle24   
-0000ceba  USB_Out_callback        
-0000cec0  __TI_ISR_TRAP           
-0000cec6  _system_pre_init        
-0000ceca  C$$EXIT                 
-0000ceca  abort                   
-0000cece  _nop                    
+0000c79c  IOputs                  
+0000c948  malloc                  
+0000c9f4  ft201x_i2c_read         
+0000ca98  _auto_init_hold_wdt     
+0000cb8c  main                    
+0000cbfc  _setjmp                 
+0000cbfc  setjmp                  
+0000cc2c  longjmp                 
+0000cc5a  ft201x_i2c_out8bits     
+0000ccb6  ft201x_init             
+0000cd12  IOputc                  
+0000cd68  ft201x_i2c_write        
+0000cdb6  IObuffer_create         
+0000ce48  USBOutEvent             
+0000ce8c  WDT_ISR                 
+0000ced0  USBInEvent              
+0000cf10  __memcpy_far            
+0000cf50  __TI_zero_init          
+0000cf8e  IOgetc                  
+0000cfca  __TI_decompress_none    
+0000d006  minit                   
+0000d03e  i2c_out_stop            
+0000d072  Port_1_ISR              
+0000d09c  ft201x_i2c_start_address
+0000d0c6  i2c_clockhigh           
+0000d0ec  i2c_clocklow            
+0000d112  i2c_init                
+0000d150  _c_int00_noargs_noexit  
+0000d16a  __TI_decompress_rle24   
+0000d178  ERROR                   
+0000d182  USB_Out_callback        
+0000d188  __TI_ISR_TRAP           
+0000d18e  _system_pre_init        
+0000d192  C$$EXIT                 
+0000d192  abort                   
+0000d196  _nop                    
 0000ffce  __TI_int31              
 0000ffd8  __TI_int36              
 0000ffde  __TI_int39              
@@ -1358,4 +1380,4 @@ ffffffff  binit
 UNDEFED   __TI_INITARRAY_Base     
 UNDEFED   __TI_INITARRAY_Limit    
 
-[547 symbols]
+[554 symbols]

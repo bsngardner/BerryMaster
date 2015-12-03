@@ -70,7 +70,7 @@
 
 // System errors
 enum SYS_ERRORS {
-	SYS_ERR_430init = 1,	// 1 eZ430X initialize
+	SYS_ERR_430init = 1,	// 1 initialize
 	SYS_ERR_USCB_RX,		// 2 USCB receive timeout
 	SYS_ERR_I2C_TO,			// 3 i2c timeout
 	SYS_ERR_I2C_ACK,		// 4 i2c ACK timeout
@@ -82,6 +82,9 @@ enum SYS_ERRORS {
 	SYS_ERR_WDT_MUTEX,		// 10 WDT mutex fault
 	SYS_ERR_DC_MAX,			// 11 too many events in DC
 };
+
+void ERROR(int error);
+void ERROR2(int type, int err);
 
 // Maximum size of a message to or from the Master
 #define MAX_MSG_LENGTH 64

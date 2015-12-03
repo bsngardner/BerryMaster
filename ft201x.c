@@ -29,6 +29,12 @@ int insertDC(uint16_t event, uint16_t time);
 extern volatile uint16_t sys_event;
 //extern volatile command_st my_cmd;
 
+// local function prototypes
+inline void ft201x_i2c_out_bit(uint8_t bit);
+int ft201x_i2c_out8bits(uint8_t c);
+inline void ft201x_i2c_out_stop();
+int ft201x_i2c_start_address(uint8_t address);
+
 //*****************************************************************************
 //	Define port macros for the current board
 #if defined(MAMA_REV_A)
@@ -71,20 +77,34 @@ void USB_In_callback() {
 }
 
 //*****************************************************************************
-//	Right now this just sets up the ports, nothing else...
+//
 //
 int ft201x_init() {
 
 	// Create an output buffer to send to host
 	io_usb_out = IObuffer_create(MAX_MSG_LENGTH);
+	if (io_usb_out == NULL) {
+		// Error creating the IO buffer
+		return SYS_ERR_430init;
+	}
 
 	// Set custom callback function.
 	io_usb_out->bytes_ready = USB_Out_callback;
 
 	// Need this input buffer to read data from host.
 	io_usb_in = IObuffer_create(MAX_MSG_LENGTH);
+	if (io_usb_in == NULL) {
+		// Error creating the IO buffer
+		return SYS_ERR_430init;
+	}
 	io_usb_in->bytes_ready = NULL;
 
+	// Flush the ft201x tx and rx buffers todo: make this a funciton or macro
+	ft201x_i2c_start_address(0);
+	ft201x_i2c_out8bits(0x0E);
+	ft201x_i2c_out_stop();
+
+	// return success
 	return 0;
 }
 
@@ -232,20 +252,20 @@ int ft201x_i2c_read(int bytes) {
 
 // Poll the USB input buffer.
 void USBInEvent() {
-	int i;
+	int err;
 
 	// Read input characters from computer into io_usb_in
-	if (!(i = setjmp(usb_i2c_context))) {
+	if (!(err = setjmp(usb_i2c_context))) {
 		// First invocation (no error yet)
-//		while(!ft201x_i2c_read(1));
-		if (!ft201x_i2c_read(1)) { // just read one byte.
+		while(!ft201x_i2c_read(1));
+//		if (!ft201x_i2c_read(1)) { // just read one byte.
 			// success
-		}
+		//}
 	} else {
-		// Error! The error value is the var i
+		// Error! The error value is the var err
 		// todo: for now, I'll echo the error;
 		// later I want to handle this differently
-		IOputc((char)i, io_usb_out);
+		IOputc((char)err, io_usb_out);
 	}
 
 	// todo: just for testing - echo the rxed char.
@@ -254,7 +274,7 @@ void USBInEvent() {
 	if (IOgetc(&c, io_usb_in) == 0) {
 		// Got it. Now try to put it into io_usb_out.
 		if (IOputc(c, io_usb_out) != 0) {
-			// error
+			// todo error
 		}
 	}
 

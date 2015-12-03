@@ -37,8 +37,8 @@ uint16_t i2c_delay;
 
 //******************************************************************************
 
-#define I2C_CLOCK_LOW		P1OUT &= ~SCL		// put clock low FIXME
-#define I2C_CLOCK_HIGH		P1OUT |= SCL		// put clock high FIXME
+#define I2C_CLOCK_HIGH		P1DIR &= ~SCL		// put clock high
+#define I2C_CLOCK_LOW		P1DIR |= SCL		// put clock low
 // driving the clock this way breaks clock stretching
 
 #define I2C_DATA_LOW		P1DIR |= SDA		// put data low
@@ -63,15 +63,6 @@ uint8_t i2c_init()
 
 	i2c_delay = 0;//i2c_fSCL;
 //	i2c_delay = I2C_DELAY;
-
-	P1SEL0 &= ~(SDA | SCL);			// GPIO Mode
-	P1SEL1 &= ~(SDA | SCL);
-
-	P1DIR &= ~SDA;					// set SDA as input (high)
-	P1OUT &= ~SDA;					// setup SDA for low
-
-	P1DIR |= SCL;					// set SCL as output
-	P1OUT |= SCL;					// set SCL high
 
 	// output 9 clocks with SDA high
 	for (i = 9; i > 0; i--)
