@@ -24,6 +24,18 @@
  * J.3	O	ASCL	|	2.5			O	RFCS (Radio chip select)
  */
 
+// TODO's:
+// Modify USB input event to accept commands from host
+// Modify USB output event to correctly output a reply to the host
+// Port over server code
+// Add in SPI init code for radio
+// Fix ft201x hardware interrupt - it is always pulling the line low, even
+//   after we empty the hardware buffers (which should let the line float high)
+
+// TODO: COULD USE ENTIRE LENGTH OF MESSAGE (ALL 64 BYTES) FOR DEBUG MESSAGE
+// SO THE LENGTH IS THE SAME EVERY TIME - THIS WILL SIMPLIFY PRINTING DEBUG OR
+// ERROR MESSAGES ON THE MASTER
+
 // Standard includes
 #include <msp430.h>
 #include <stdint.h>
@@ -33,11 +45,14 @@
 #include "ft201x.h"
 #include "IObuffer.h"
 #include "i2c.h"
+#include "server.h"
 
 // Macros
 #define WDT_CLKS_PER_SEC	512				// 512 Hz WD clock (@32 kHz)
 #define WDT_CTL				WDT_ADLY_1_9	// 1.95 ms
 #define DEBOUNCE_CNT		20
+#define USB_POLL_CNT		32
+#define MAX_EVENT_ERRORS	10
 
 // Local function prototypes
 static int WDT_init();
@@ -52,17 +67,17 @@ volatile uint16_t sys_event;
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
 
-#define STRING "HELLO WORLD!!\r\n"
-
 /*
  * main.c
  */
 int main(void) {
+	int numEventErrors = 0;
 
 	// initialize the board
-	msp430init();
-
-	sys_event |= USB_I_EVENT;
+	if (msp430init()) {
+		// error initializing the board - spin in an idle loop
+		while(1) handleError();
+	}
 
 	// Wait for an interrupt
     while(1) {
@@ -75,7 +90,7 @@ int main(void) {
 		}
 		else {
 			// otherwise, enable interrupts and goto sleep (LPM0)
-			__bis_SR_register(LPM0_bits + GIE);
+			__bis_SR_register(LPM0_bits | GIE);
 			continue;
 		}
 
@@ -88,22 +103,29 @@ int main(void) {
 			sys_event &= ~USB_O_EVENT;
 			USBOutEvent();
 		}
-		// TODO: Get rid of this event. It was just for testing writing
-		// output to the computer.
-		else if (sys_event & WRITE_DEBUG_EVENT) {
-			sys_event &= ~WRITE_DEBUG_EVENT;
-			// Write to the IO buffer and send info to computer
-			IOputs(STRING, io_usb_out);
-			IOputc(0, io_usb_out);
+		else if (sys_event & SERVER_EVENT) {
+			sys_event &= ~SERVER_EVENT;
+			serverEvent();
 		}
 		else {
-			ERROR(SYS_ERR_EVENT); // ERROR. Unrecognized event.
+			// ERROR. Unrecognized event. Report it.
+			reportError("UnrecognizedEventErr", SYS_ERR_EVENT);
+
+			// Clear all pending events -
+			// attempt to let the system correct itself.
+			sys_event = 0;
+
+			// If the number of event errors reaches a predefined value,
+			// stop the program
+			numEventErrors++;
+			if (numEventErrors >= MAX_EVENT_ERRORS) {
+				handleError();
+			}
 		}
     }
-
-//	return 0;
 }
 
+// Initialize the msp430 clock and crystal
 static int setClock() {
 	CSCTL0 = CSKEY; 				// Enable Clock access
 	CSCTL1 &= ~(DCORSEL | 0x0006); 	// Clear clock control bits
@@ -112,10 +134,6 @@ static int setClock() {
 	i2c_fSCL = (24000 / I2C_FSCL);	// fSCL
 
 	// Initialize the crystal
-	PJSEL0 |= 0x10;					// Xtal mode for pin 4
-	PJSEL1 &= 0x10;					// Xtal mode for pin 4
-// It might be good to add code for pin 5
-
 	CSCTL4 |= (XT1DRIVE1 | XT1DRIVE0);
 // Wait for XT1 to start by trying to clear fault flag until it succeeds
 	CSCTL4 &= ~XT1OFF; // Turn XT1 on--this might be done by itself.
@@ -135,13 +153,13 @@ static int WDT_init() {
 	SFRIE1 |= WDTIE; // Enable WDT interrupt
 
 	WDT_cps_cnt = WDT_CLKS_PER_SEC;	// set WD 1 second counter
-	usb_poll_cnt = WDT_CLKS_PER_SEC >> 4; // 1/16 sec
+	usb_poll_cnt = USB_POLL_CNT; // 1/16 sec
 	return 0;
 }
 
 // Initialize ports, timers, clock, etc. for the msp430
 static int msp430init() {
-	ERROR(WDT_init()); // init the watchdog timer
+	int err;
 
 	// Initialize Port 1
 	P1SEL0 = P1SEL1 = 0; // Port 1 is GPIO
@@ -152,21 +170,43 @@ static int msp430init() {
 	P1IES = SW1 | USBINT; // interrupt on falling edge
 	P1OUT = SW1 | INT0 | INT1 | USBINT;
 
-	// TODO: Initialize Port 2
+	// Initialize Port 2
+	P2SEL0 = P2SEL1 = 0; // Port 2 is GPIO
+	P2DIR = MOSI | MOBI | RFCS | RFCE; // these are outputs, others are inputs
+	P2REN = BCHG; // pull-up on battery charger
+	P2OUT = RFCS | BCHG; // high on radio chip select and battery charger
 
 	// Initialize Port J
-	PJSEL0 &= ~0x0f; // first 4 pins are GPIO (J.4 and J.5 are crystal pins)
-	PJSEL1 &= ~0x0f; // GPIO
+	// first 4 pins are GPIO, J.4 and J.5 are crystal pins, J.6 and J.7 unused
+	// Set J.4 and J.5 PJSEL1 to 0, PJSEL0 to 1 for use as a crystal
+	PJSEL0 = 0x30;
+	PJSEL1 = 0;
 	PJREN &= ~0x0f; // no pull-up resistors
-    PJDIR = LED0 | LED1; // set LED pins as output, all others as input
-	PJOUT &= ~0x0f; // all pins low
-    LED0_OFF; // LED0 off
-    LED1_OFF; // LED1 off
+    PJDIR = LED0 | LED1 | 0xC0; // LEDs and unused pins are output
+	PJOUT &= ~0x0f; // all output pins low
 
-    // Special init functions for the peripherals
-    ERROR(setClock()); // init the clock (also on port J)
-    ERROR(ft201x_init()); // Initialize the USB comm chip (ft201x)
-    ERROR(i2c_init());
+    // Special init functions for the peripherals - if an error occurs
+    // (a function returns non-zero), then print the error to the console:
+
+	if (err = WDT_init()) { // init the watchdog timer
+		reportError("WDTinit err", err);
+		return err;
+	}
+
+    if (err = setClock()) { // init the clock (also on port J)
+    	reportError("setClk err", err);
+    	return err;
+    }
+
+    if (err = ft201x_init()) { // init the USB comm chip (ft201x)
+    	reportError("ft201x err", err);
+    	return err;
+    }
+
+    if (err = i2c_init()) { // init i2c
+    	reportError("i2c err", err);
+    	return err;
+    }
 
     // Enable global interrupts
     __enable_interrupt();
@@ -174,82 +214,41 @@ static int msp430init() {
 	return 0;
 }
 
-//******************************************************************************
-//	report hard error
-//
-void ERROR(int error)
-{
-	ERROR2(0, error);
-} // end ERROR
+// Reports an error to the user
+void reportError(char* msg, int err) {
+	IOputs(msg, io_usb_out);
+	IOputc((char)(err+ASCII_ZERO), io_usb_out);
+	IOputs("\n\r", io_usb_out);
+	while (USBOutEvent()); // keep calling until it returns done.
+}
 
-void ERROR2(int class, int error)
-{
-	volatile int i, j, k;
+// Just spins in an infinite loop
+void handleError() {
+	volatile int i = 0;
+	volatile int j = 0;
+#define DELAY -30000
+#define DELAY2 5
+	// todo: I don't know what to do if this happens besides blink LEDs
+	// I may want to do some kind of system reset.
+	// Include some close functions on the various peripherals, make sure
+	// that I free memory
 
-// return if no error
-	if (error == 0)
-		return;
+	__disable_interrupt(); // Disable interrupts
+	WDTCTL = WDTPW | WDTHOLD; // Turn off watchdog
+	ft201x_close();
 
-	__disable_interrupt();
-	//todo: BDL_init(_1MHZ); // system reset @1 MHz
-
-	k = 10;
-	while (k--)
-	{
-		// pause
-		LED0_OFF;
-		for (i = 4; i > 0; --i)
-			for (j = -1; j; --j)
-				;
-
-		// flash LED's 10 times
-		i = 10;
-		while (i--)
-		{
-			LED0_TOGGLE;
-			for (j = 8000; j > 0; --j)
-				;
+	// Loop forever - short delay between toggling LEDs
+	LED0_OFF;
+	LED1_ON;
+	while (1) {
+		j = DELAY2;
+		while (j-- != 0) {
+			i = DELAY;
+			while (i-- != 0);
 		}
-
-		// pause
-		LED0_OFF;
-		for (i = 1; i > 0; --i)
-			for (j = -1; j; --j)
-				;
-
-		// now blink class
-		for (i = class; i > 0; --i)
-		{
-			LED0_ON;
-			for (j = -1; j; --j)
-				;
-			LED0_OFF;
-			for (j = -1; j; --j)
-				;
-		}
-
-		// pause again
-		LED0_OFF;
-		for (i = 1; i > 0; --i)
-			for (j = -1; j; --j)
-				;
-		for (i = 1; i > 0; --i)
-			for (j = -1; j; --j)
-				;
-
-		// now blink error #
-		for (i = error; i > 0; --i)
-		{
-			LED0_ON;
-			for (j = -1; j; --j)
-				;
-			LED0_OFF;
-			for (j = -1; j; --j)
-				;
-		}
+		LEDS_TOGGLE;
 	}
-	WDTCTL = 0; //die
-} // end ERROR2
+}
 
 //-----------------------------------------------------------------------------
 //	Watchdog Timer ISR
@@ -264,16 +263,12 @@ __interrupt void WDT_ISR(void) {
 	if (WDT_cps_cnt == 0) {
 		WDT_cps_cnt = WDT_CLKS_PER_SEC;
 		LED0_TOGGLE; // toggle heartbeat LED
-
-//		// Signal write-debug event just for fun. Wake up to service it.
-//    	sys_event |= WRITE_DEBUG_EVENT;
-//    	__bic_SR_register_on_exit(LPM0_bits);
 	}
 
 	// Should we poll the USB?
 	if (usb_poll_cnt == 0) {
 		sys_event |= USB_I_EVENT; // poll the usb chip (ft201x)
-		usb_poll_cnt = WDT_CLKS_PER_SEC >> 4; // 1/16 sec
+		usb_poll_cnt = USB_POLL_CNT; // 1/16 sec
 		__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
 	}
 
@@ -282,8 +277,7 @@ __interrupt void WDT_ISR(void) {
 		// Yes; are we finished?
 		--debounceCnt;
 		if (debounceCnt == 0) {
-			// TODO: Signal button event. Remove toggling the LED.
-			LED1_TOGGLE;
+			// TODO: Signal button event.
 		}
 	}
 }
@@ -299,30 +293,17 @@ __interrupt void Port_1_ISR(void)
 		// Clear the pending interrupt.
 		P1IFG &= ~USBINT;
 
-		// Signal write-debug event just for fun. Wake up to service it.
-    	// sys_event |= WRITE_DEBUG_EVENT;
-    	__bic_SR_register_on_exit(LPM0_bits);
-
-    	sys_event |= USB_I_EVENT;
-
-//		IOputc('a', io_usb_out);
-//		IOputc('\r', io_usb_out);
-//		IOputc(0, io_usb_out);
-
-//		LED1_TOGGLE;
-
 		// Signal USB input event
-//		sys_event |= USB_I_EVENT;
+		sys_event |= USB_I_EVENT;
 
 		// Wake up the processor
-//		__bic_SR_register_on_exit(LPM0_bits);
-
+		__bic_SR_register_on_exit(LPM0_bits);
 	}
 
 	// Switch1 interrupt?
 	if (P1IFG & SW1) {
-		debounceCnt = DEBOUNCE_CNT;
-		P1IFG &= ~SW1;
+		debounceCnt = DEBOUNCE_CNT; // set debounce count
+		P1IFG &= ~SW1; // clear interrupt flag
 	}
 
 	// Radio interrupt?

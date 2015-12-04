@@ -7,10 +7,13 @@ SHELL = cmd.exe
 CG_TOOL_ROOT := C:/ti/ccsv6/tools/compiler/ti-cgt-msp430_4.4.3
 
 ORDERED_OBJS += \
+"./BerryMaster.obj" \
 "./IObuffer.obj" \
 "./ft201x.obj" \
+"./hal.obj" \
 "./i2c.obj" \
 "./main.obj" \
+"./server.obj" \
 "../lnk_msp430fr5738.cmd" \
 $(GEN_CMDS__FLAG) \
 -l"libmath.a" \
@@ -150,8 +153,8 @@ NewBerryMaster.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)$(BIN_OUTPUTS__QUOTED)
-	-$(RM) "IObuffer.pp" "ft201x.pp" "i2c.pp" "main.pp" 
-	-$(RM) "IObuffer.obj" "ft201x.obj" "i2c.obj" "main.obj" 
+	-$(RM) "BerryMaster.pp" "IObuffer.pp" "ft201x.pp" "hal.pp" "i2c.pp" "main.pp" "server.pp" 
+	-$(RM) "BerryMaster.obj" "IObuffer.obj" "ft201x.obj" "hal.obj" "i2c.obj" "main.obj" "server.obj" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

@@ -15,7 +15,6 @@ int IOputc(char c, IObuffer* iob) {
 	// Return error if buffer is null or inactive or full
 	if (!iob || !iob->size || (iob->size - iob->count <= 0))
 		return -1; // error
-	// TODO: check for null buffer? (Ouch 6/20/2015)
 
 	// Disable interrupts for interrupt-driven IO
 
@@ -167,8 +166,11 @@ void IObuffer_init(IObuffer* iob, char* buffer, int size, void (*cb)(void)) {
 
 void IObuffer_destroy(IObuffer* iob) {
 	if (iob) {
-		if (iob->buffer)
+		if (iob->buffer) {
 			free(iob->buffer);
+			iob->buffer = NULL;
+		}
 		free(iob);
+		iob = NULL;
 	}
 }

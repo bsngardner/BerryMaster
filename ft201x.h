@@ -8,10 +8,12 @@
 
 // Global function prototypes
 int ft201x_init();
+void ft201x_close();
 void ft201x_i2c_write(char*, int16_t);
 int ft201x_i2c_read(int16_t);
+int ft201x_flushBuffers();
 void USBInEvent();
-void USBOutEvent();
+int USBOutEvent();
 
 // Global variables
 extern jmp_buf usb_i2c_context;	// error context

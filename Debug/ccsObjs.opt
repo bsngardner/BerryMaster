@@ -1,1 +1,1 @@
-"./IObuffer.obj" "./ft201x.obj" "./i2c.obj" "./main.obj" "../lnk_msp430fr5738.cmd" -l"libmath.a" -l"libc.a" 
+"./BerryMaster.obj" "./IObuffer.obj" "./ft201x.obj" "./hal.obj" "./i2c.obj" "./main.obj" "./server.obj" "../lnk_msp430fr5738.cmd" -l"libmath.a" -l"libc.a" 
