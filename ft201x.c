@@ -13,6 +13,7 @@
 #include <msp430.h>
 #include <setjmp.h>
 #include "BerryMaster.h"
+#include "server.h"
 #include "ft201x.h"
 
 // Global variables
@@ -361,7 +362,7 @@ void USBInEvent() {
 
 // Output the out buffer to the usb
 int USBOutEvent() {
-#define BUF_SIZE 32 // was 16
+#define BUF_SIZE MAX_MSG_LENGTH
 	int i; // byte count
 	char buf[BUF_SIZE]; // out buffer (double buffering is inefficient here...)
 
