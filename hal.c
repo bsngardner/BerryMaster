@@ -5,10 +5,10 @@
  *      Author: Broderick
  */
 
-#include <ioprintf.h>
+//#include <ioprintf.h>
 #include <stdint.h>
 #include "hal.h"
-#include "driverlib.h"
+#include "msp430.h"
 
 //enum used to track state and communicate between sending functions and isr
 typedef enum {
@@ -40,8 +40,7 @@ volatile static I2C_STATUS status = STOP;
 // sets up SDA and SCL, inits eUSCI module, enables interrupt vector
 uint8_t hal_init() {
 
-	P1SEL1 |= (SDA | SCL);
-	P1SEL0 &= ~(SDA | SCL);
+	P1SEL1 |= (SDA_PIN | SCL_PIN);
 
 	UCB0CTLW0 |= UCSWRST;                          // put eUSCI_B in reset state
 	UCB0CTLW0 &= ~UCSSEL_2;
@@ -58,7 +57,7 @@ void configure_i2c(uint8_t num_bytes) {
 	UCB0CTLW0 |= UCTR;
 	UCB0CTLW1 &= ~UCASTP_3;
 	UCB0CTLW1 |= UCASTP_2;
-	UCB0TBCNT = numBytes;
+	UCB0TBCNT = num_bytes;
 
 	UCB0CTLW0 &= ~UCSWRST;
 }
@@ -214,7 +213,8 @@ uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret_val) {
 #define CLTO_IV	0x1C
 #define BIT9_IV	0x1E
 
-void euscib0_isr(void) {
+#pragma vector=USCI_B0_VECTOR
+__interrupt void euscib0_isr(void) {
 
 	switch (UCB0IV) {
 	case NACK_IV:

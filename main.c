@@ -31,11 +31,9 @@
 // Add in SPI init code for radio
 // Fix ft201x hardware interrupt - it is always pulling the line low, even
 //   after we empty the hardware buffers (which should let the line float high)
-
 // TODO: COULD USE ENTIRE LENGTH OF MESSAGE (ALL 64 BYTES) FOR DEBUG MESSAGE
 // SO THE LENGTH IS THE SAME EVERY TIME - THIS WILL SIMPLIFY PRINTING DEBUG OR
 // ERROR MESSAGES ON THE MASTER
-
 // Standard includes
 #include <msp430.h>
 #include <stdint.h>
@@ -45,7 +43,8 @@
 #include "ft201x.h"
 #include "IObuffer.h"
 #include "i2c.h"
-#include "server.h"
+//#include "server.h"
+#include "hal.h"
 
 // Macros
 #define WDT_CLKS_PER_SEC	512				// 512 Hz WD clock (@32 kHz)
@@ -76,19 +75,20 @@ int main(void) {
 	// initialize the board
 	if (msp430init()) {
 		// error initializing the board - spin in an idle loop
-		while(1) handleError();
+		while (1)
+			handleError();
 	}
+	hal_init();
 
 	// Wait for an interrupt
-    while(1) {
+	while (1) {
 		// disable interrupts before check sys_event
 		__disable_interrupt();
 
 		if (sys_event) {
 			// if there's something pending, enable interrupts before servicing
 			__enable_interrupt();
-		}
-		else {
+		} else {
 			// otherwise, enable interrupts and goto sleep (LPM0)
 			__bis_SR_register(LPM0_bits | GIE);
 			continue;
@@ -98,16 +98,13 @@ int main(void) {
 		if (sys_event & USB_I_EVENT) {
 			sys_event &= ~USB_I_EVENT;
 			USBInEvent();
-		}
-		else if (sys_event & USB_O_EVENT) {
+		} else if (sys_event & USB_O_EVENT) {
 			sys_event &= ~USB_O_EVENT;
 			USBOutEvent();
-		}
-		else if (sys_event & SERVER_EVENT) {
+		} else if (sys_event & SERVER_EVENT) {
 			sys_event &= ~SERVER_EVENT;
-			serverEvent();
-		}
-		else {
+			//serverEvent();
+		} else {
 			// ERROR. Unrecognized event. Report it.
 			reportError("UnrecognizedEventErr", SYS_ERR_EVENT);
 
@@ -122,7 +119,7 @@ int main(void) {
 				handleError();
 			}
 		}
-    }
+	}
 }
 
 // Initialize the msp430 clock and crystal
@@ -182,34 +179,34 @@ static int msp430init() {
 	PJSEL0 = 0x30;
 	PJSEL1 = 0;
 	PJREN &= ~0x0f; // no pull-up resistors
-    PJDIR = LED0 | LED1 | 0xC0; // LEDs and unused pins are output
+	PJDIR = LED0 | LED1 | 0xC0; // LEDs and unused pins are output
 	PJOUT &= ~0x0f; // all output pins low
 
-    // Special init functions for the peripherals - if an error occurs
-    // (a function returns non-zero), then print the error to the console:
+	// Special init functions for the peripherals - if an error occurs
+	// (a function returns non-zero), then print the error to the console:
 
 	if (err = WDT_init()) { // init the watchdog timer
 		reportError("WDTinit err", err);
 		return err;
 	}
 
-    if (err = setClock()) { // init the clock (also on port J)
-    	reportError("setClk err", err);
-    	return err;
-    }
+	if (err = setClock()) { // init the clock (also on port J)
+		reportError("setClk err", err);
+		return err;
+	}
 
-    if (err = ft201x_init()) { // init the USB comm chip (ft201x)
-    	reportError("ft201x err", err);
-    	return err;
-    }
+	if (err = ft201x_init()) { // init the USB comm chip (ft201x)
+		reportError("ft201x err", err);
+		return err;
+	}
 
-    if (err = i2c_init()) { // init i2c
-    	reportError("i2c err", err);
-    	return err;
-    }
+	if (err = i2c_init()) { // init i2c
+		reportError("i2c err", err);
+		return err;
+	}
 
-    // Enable global interrupts
-    __enable_interrupt();
+	// Enable global interrupts
+	__enable_interrupt();
 
 	return 0;
 }
@@ -217,9 +214,10 @@ static int msp430init() {
 // Reports an error to the user
 void reportError(char* msg, int err) {
 	IOputs(msg, io_usb_out);
-	IOputc((char)(err+ASCII_ZERO), io_usb_out);
+	IOputc((char) (err + ASCII_ZERO), io_usb_out);
 	IOputs("\n\r", io_usb_out);
-	while (USBOutEvent()); // keep calling until it returns done.
+	while (USBOutEvent())
+		; // keep calling until it returns done.
 }
 
 // Just spins in an infinite loop
@@ -244,7 +242,8 @@ void handleError() {
 		j = DELAY2;
 		while (j-- != 0) {
 			i = DELAY;
-			while (i-- != 0);
+			while (i-- != 0)
+				;
 		}
 		LEDS_TOGGLE;
 	}
@@ -286,8 +285,7 @@ __interrupt void WDT_ISR(void) {
 //	Port 1 ISR
 //
 #pragma vector=PORT1_VECTOR
-__interrupt void Port_1_ISR(void)
-{
+__interrupt void Port_1_ISR(void) {
 	// USB interrupt?
 	if (P1IFG & USBINT) {
 		// Clear the pending interrupt.
@@ -314,7 +312,6 @@ __interrupt void Port_1_ISR(void)
 //		sys_event |= INTERRUPT;
 //		__bic_SR_register_on_exit(LPM0_bits);
 //	}
-
 
 }
 

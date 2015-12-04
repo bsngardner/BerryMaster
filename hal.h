@@ -8,8 +8,8 @@
 #ifndef HAL_H_
 #define HAL_H_
 
-#define SCL_PIN GPIO_PIN7
-#define SDA_PIN GPIO_PIN6
+#define SCL_PIN BIT7
+#define SDA_PIN BIT6
 
 #define ADDR_ACCEPTED 0
 #define ADDR_REJECTED 2
