@@ -25,9 +25,7 @@
  */
 
 // TODO's:
-// Modify USB input event to accept commands from host
-// Modify USB output event to correctly output a reply to the host
-// Port over server code
+// Keep searching for bugs in ported over master code
 // Add in SPI init code for radio
 // Fix ft201x hardware interrupt - it is always pulling the line low, even
 //   after we empty the hardware buffers (which should let the line float high)
@@ -104,6 +102,7 @@ int main(void) {
 			USBOutEvent();
 		}
 		else if (sys_event & SERVER_EVENT) {
+			reportError("hi bro ", 24);
 			sys_event &= ~SERVER_EVENT;
 			serverEvent();
 		}
@@ -216,9 +215,22 @@ static int msp430init() {
 
 // Reports an error to the user
 void reportError(char* msg, int err) {
-	IOputs(msg, io_usb_out);
-	IOputc((char)(err+ASCII_ZERO), io_usb_out);
-	IOputs("\n\r", io_usb_out);
+	int byteCount;
+	// fill up the buffer - it's easier for us to fill up the buffer all the
+	// way than to try to count the size of each error message
+	IOputc((char)(io_usb_out->size), io_usb_out);
+	// put the type of message (error) in the buffer
+	IOputc((char)(TYPE_ERROR), io_usb_out);
+	// put the message in - count how many bytes that is
+	byteCount = IOputs(msg, io_usb_out);
+	// is there space left?
+	if (byteCount > 0) {
+		// yes, put in the error code and then fill it up with nulls
+		IOputc((char)err+ASCII_ZERO, io_usb_out);
+		while (IOputc(0, io_usb_out) == SUCCESS);
+	}
+	// no, buffer is full - didn't finish putting message into buffer.
+	// just send the message as is.
 	while (USBOutEvent()); // keep calling until it returns done.
 }
 
