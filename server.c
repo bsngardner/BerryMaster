@@ -94,6 +94,7 @@ void rpc_getDeviceType(uint8_t* message, uint8_t len) {
 
 void rpc_getDeviceValue(uint8_t* message, uint8_t len) {
 
+	reportError("test in getDeviceValue function", 32);
 	// get the address from the message
 	uint8_t addr = message[OFFSET_ADDR];
 

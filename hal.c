@@ -49,4 +49,3 @@ uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* value) {
 	*value = devValues[address-1];
 	return 0;
 }
-
