@@ -6,14 +6,14 @@ SHELL = cmd.exe
 
 CG_TOOL_ROOT := C:/ti/ccsv6/tools/compiler/ti-cgt-msp430_4.4.3
 
+GEN_OPTS__FLAG := 
+GEN_CMDS__FLAG := 
+
 ORDERED_OBJS += \
-"./BerryMaster.obj" \
 "./IObuffer.obj" \
 "./ft201x.obj" \
-"./hal.obj" \
 "./i2c.obj" \
 "./main.obj" \
-"./server.obj" \
 "../lnk_msp430fr5738.cmd" \
 $(GEN_CMDS__FLAG) \
 -l"libmath.a" \
@@ -140,7 +140,7 @@ all: NewBerryMaster.out
 NewBerryMaster.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: MSP430 Linker'
-	"C:/ti/ccsv6/tools/compiler/ti-cgt-msp430_4.4.3/bin/cl430" -vmspx --abi=eabi --opt_for_speed=1 --use_hw_mpy=F5 --advice:power="all" -g --define=__MSP430FR5738__ --diag_warning=225 --display_error_number --diag_wrap=off --silicon_errata=CPU21 --silicon_errata=CPU22 --silicon_errata=CPU40 --printf_support=minimal -z -m"NewBerryMaster.map" --heap_size=320 --stack_size=320 --cinit_hold_wdt=on -i"C:/ti/ccsv6/ccs_base/msp430/include" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-msp430_4.4.3/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-msp430_4.4.3/include" -i"C:/ti/ccsv6/ccs_base/msp430/lib/5xx_6xx_FRxx" --reread_libs --warn_sections --display_error_number --diag_wrap=off --xml_link_info="NewBerryMaster_linkInfo.xml" --use_hw_mpy=F5 --rom_model -o "NewBerryMaster.out" $(ORDERED_OBJS)
+	"C:/ti/ccsv6/tools/compiler/ti-cgt-msp430_4.4.3/bin/cl430" -vmspx --abi=eabi --opt_for_speed=1 --use_hw_mpy=F5 --advice:power="all" -g --define=__MSP430FR5738__ --display_error_number --diag_wrap=off --diag_warning=225 --silicon_errata=CPU21 --silicon_errata=CPU22 --silicon_errata=CPU40 --printf_support=minimal -z -m"NewBerryMaster.map" --stack_size=320 --heap_size=320 --cinit_hold_wdt=on -i"C:/ti/ccsv6/ccs_base/msp430/include" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-msp430_4.4.3/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-msp430_4.4.3/include" -i"C:/ti/ccsv6/ccs_base/msp430/lib/5xx_6xx_FRxx" --reread_libs --diag_wrap=off --warn_sections --display_error_number --xml_link_info="NewBerryMaster_linkInfo.xml" --use_hw_mpy=F5 --rom_model -o "NewBerryMaster.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -153,8 +153,8 @@ NewBerryMaster.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)$(BIN_OUTPUTS__QUOTED)
-	-$(RM) "BerryMaster.pp" "IObuffer.pp" "ft201x.pp" "hal.pp" "i2c.pp" "main.pp" "server.pp" 
-	-$(RM) "BerryMaster.obj" "IObuffer.obj" "ft201x.obj" "hal.obj" "i2c.obj" "main.obj" "server.obj" 
+	-$(RM) "IObuffer.pp" "ft201x.pp" "i2c.pp" "main.pp" 
+	-$(RM) "IObuffer.obj" "ft201x.obj" "i2c.obj" "main.obj" 
 	-@echo 'Finished clean'
 	-@echo ' '
 
