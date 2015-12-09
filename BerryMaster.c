@@ -135,7 +135,7 @@ int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg) {
 	// valid device
 	else {
 		// call hal to get the value.
-		if (error = hal_getDeviceRegister(addr, reg, (uint8_t*)value)) {
+		if (error = hal_getDeviceRegister(addr, reg, value)) {
 			// operation failed
 			*value = 0xff;
 			return error;
@@ -259,19 +259,22 @@ static int getNewDevices() {
 		addr = findUnusedAddress();
 		if (addr == 0) {
 			// error - full network
-			// fixme: this is actually wrong: if we have exactly the
+			// todo: Note - If we have exactly the
 			// maximum number of allowed devices then this will return an
-			// error when it shouldn't
+			// error. Should we say there can only be one less device (126)
+			// than the maximum number of available addresses (127)?
 			return NETWORK_FULL;
 		}
-		// todo: error check hal_discoverNewDevice
+		// Offer a new address to an open device.
 		else if (!(hal_discoverNewDevice(addr))) {
-			// No error, record the address of the device
+			// A new device grabbed the requested address!
+			// Record the address of the device.
 			myDeviceList.devices[addr].deviceAddress = addr;
 			// get the type of the device and assign the type
 			if (error = getDeviceTypeFromHal(addr, &type)) {
 				// error - failed to get the type from the device
 				myDeviceList.devices[addr].deviceType = UNKNOWN;
+				reportError("Unknown device type in getNewDevices", error);
 				return error;
 			}
 			// Successfully got the type

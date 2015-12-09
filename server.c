@@ -15,7 +15,41 @@
 char sentMessage[MAX_MSG_LENGTH];
 volatile int buffLocked = FALSE;
 
-// Functions
+// ----------------------------------------------------------------------------
+// Function prototypes --------------------------------------------------------
+// ----------------------------------------------------------------------------
+
+// calls master initDevices function
+// and sends a reply back to the host
+void rpc_initDevices(uint8_t* message, uint8_t len);
+
+// gets the address from the message
+// calls master getDeviceType
+// and sends reply back to host
+void rpc_getDeviceType(uint8_t* message, uint8_t len);
+
+void rpc_getDeviceValue(uint8_t* message, uint8_t len);
+
+void rpc_setDeviceValue(uint8_t* message, uint8_t len);
+
+int recv_request(uint8_t* message);
+int send_reply(uint8_t* message, int size);
+
+/*
+ * puts an integer into the message array (LITTLE ENDIAN) at
+ * the position specified by offset
+ */
+void putUInt16(uint8_t* message, uint16_t num, int offset);
+
+/*
+ * gets an integer from the message array (LITTLE ENDIAN) at
+ * the position specified by offset
+ */
+uint16_t getUInt16(uint8_t* message, int offset);
+
+// ----------------------------------------------------------------------------
+// Functions ------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 int serverEvent() {
 
 	static uint8_t message[MAX_MSG_LENGTH];
@@ -26,6 +60,7 @@ int serverEvent() {
 	if (recv_request(message) == MSG_NOT_SENT_YET) {
 		// todo: error! shouldn't service this event until the message
 		// has been received
+		// I should be able to call my reportError function here...
 		handleError();
 	}
 
