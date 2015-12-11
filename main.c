@@ -43,7 +43,7 @@
 #include "ft201x.h"
 #include "IObuffer.h"
 #include "i2c.h"
-//#include "server.h"
+#include "server.h"
 #include "hal.h"
 
 // Macros
@@ -52,6 +52,7 @@
 #define DEBOUNCE_CNT		20
 #define USB_POLL_CNT		32
 #define MAX_EVENT_ERRORS	10
+#define HAL_COUNT			50
 
 // Local function prototypes
 static int WDT_init();
@@ -62,9 +63,89 @@ static int msp430init();
 static volatile int WDT_cps_cnt;
 static volatile int usb_poll_cnt;
 static volatile int debounceCnt;
+static volatile int hal_cnt = HAL_COUNT;
+
 volatile uint16_t sys_event;
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
+
+#define TYPE_REG 0
+#define STATUS_REG 1
+
+#define LED_T 0x02
+#define SW_T 0x06
+
+static struct {
+	uint8_t addr;
+	uint8_t type;
+	uint8_t reg;
+	uint8_t val;
+} devices[8] = { 0 };
+
+int i;
+uint8_t addr = 0x1;
+uint8_t new = 0;
+uint8_t reset = 0;
+
+void hal_test() {
+	if (!reset) {
+		hal_resetAllDevices();
+		reset = 1;
+	}
+
+	if (!hal_discoverNewDevice(addr)) {
+		devices[new].addr = addr;
+		hal_getDeviceRegister(devices[new].addr, TYPE_REG,
+				&(devices[new].type));
+		switch (devices[new].type) {
+		case LED_T:
+			hal_setDeviceRegister(devices[new].addr, 2, 1);
+			hal_setDeviceRegister(devices[new].addr, 3, 1);
+			hal_setDeviceRegister(devices[new].addr, 4, 1);
+			hal_setDeviceRegister(devices[new].addr, 5, 1);
+			hal_setDeviceRegister(devices[new].addr, 2, 0);
+			hal_setDeviceRegister(devices[new].addr, 3, 0);
+			hal_setDeviceRegister(devices[new].addr, 4, 0);
+			hal_setDeviceRegister(devices[new].addr, 5, 0);
+			devices[new].reg = devices[new].addr + 2;
+			break;
+		}
+		for (i = 0; i < 8; i++) {
+			if (!devices[i].addr) {
+				new = i;
+				break;
+			}
+		}
+		addr++;
+	}
+
+	for (i = 0; i < 8; i++) {
+
+		if (devices[i].addr) {
+			if (hal_pingDevice(devices[i].addr)) {
+				devices[i].addr = 0;
+			} else {
+				switch (devices[i].type) {
+				case LED_T:
+					devices[i].val ^= 0x01;
+					hal_setDeviceRegister(devices[i].addr, devices[i].reg,
+							devices[i].val);
+					break;
+				case SW_T:
+					hal_getDeviceRegister(devices[i].addr, devices[i].reg,
+							&(devices[i].val));
+					if (devices[i].val)
+						LED1_ON;
+					else
+						LED1_OFF;
+					break;
+				default:
+					break;
+				}
+			}
+		}
+	}
+}
 
 /*
  * main.c
@@ -103,7 +184,11 @@ int main(void) {
 			USBOutEvent();
 		} else if (sys_event & SERVER_EVENT) {
 			sys_event &= ~SERVER_EVENT;
-			//serverEvent();
+			serverEvent();
+		} else if (sys_event & HAL_EVENT) {
+			sys_event &= ~HAL_EVENT;
+			hal_test();
+			__no_operation();
 		} else {
 			// ERROR. Unrecognized event. Report it.
 			reportError("UnrecognizedEventErr", SYS_ERR_EVENT);
@@ -254,6 +339,12 @@ void handleError() {
 //
 #pragma vector = WDT_VECTOR
 __interrupt void WDT_ISR(void) {
+
+	if (!(--hal_cnt)) {
+		hal_cnt = HAL_COUNT;
+		sys_event |= HAL_EVENT;
+		__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
+	}
 
 	--WDT_cps_cnt;
 	--usb_poll_cnt;

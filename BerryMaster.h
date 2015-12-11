@@ -90,6 +90,7 @@ enum SYS_ERRORS {
 #define USB_I_EVENT 0x01
 #define USB_O_EVENT 0x02
 #define SERVER_EVENT 0x04
+#define HAL_EVENT 0x08
 
 // Other macros
 #define ASCII_ZERO 48

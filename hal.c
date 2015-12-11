@@ -31,7 +31,7 @@ volatile static I2C_STATUS status = STOP;
 #define NEW_ADDR_CMD 0x00
 
 #define CLOCK_SPEED 24000000
-#define I2C_SPEED 400000
+#define I2C_SPEED 500000
 
 //Addresses
 #define GEN_CALL 0x00
@@ -44,7 +44,7 @@ uint8_t hal_init() {
 
 	UCB0CTLW0 |= UCSWRST;                          // put eUSCI_B in reset state
 	UCB0CTLW0 &= ~UCSSEL_2;
-	UCB0CTLW0 |= (UCMODE_3 | UCMST | UCTR | UCSSEL_1); // I2C master mode, SMCLK
+	UCB0CTLW0 |= (UCMODE_3 | UCMST | UCTR | UCSSEL_2); // I2C master mode, SMCLK
 	UCB0BRW = CLOCK_SPEED / I2C_SPEED;        // baudrate = SMCLK /400,000
 	UCB0CTLW0 &= ~UCSWRST;                            // clear reset register
 	return 0;
@@ -173,7 +173,15 @@ uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret_val) {
 	txPtr = txData;
 	*txPtr = reg;
 	rxPtr = rxData;
-	configure_i2c(1);
+
+	UCB0CTLW0 |= UCSWRST;
+
+	UCB0CTLW0 |= UCTR;
+	UCB0CTLW1 &= ~UCASTP_3;
+	UCB0CTLW1 |= UCASTP_1;
+	UCB0TBCNT = 1;
+
+	UCB0CTLW0 &= ~UCSWRST;
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE | UCBCNTIE;
 
 	byte_count = 0;
