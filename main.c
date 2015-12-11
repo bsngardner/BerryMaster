@@ -102,7 +102,7 @@ int main(void) {
 			USBOutEvent();
 		}
 		else if (sys_event & SERVER_EVENT) {
-//			reportError("hi bro, err#", 24);
+//			reportError("server event", 24); // just for debugging
 			sys_event &= ~SERVER_EVENT;
 			serverEvent();
 		}
@@ -292,6 +292,7 @@ __interrupt void WDT_ISR(void) {
 		--debounceCnt;
 		if (debounceCnt == 0) {
 			// TODO: Signal button event.
+			LED1_TOGGLE;
 		}
 	}
 }

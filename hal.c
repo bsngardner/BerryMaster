@@ -31,7 +31,7 @@ volatile static I2C_STATUS status = STOP;
 #define NEW_ADDR_CMD 0x00
 
 #define CLOCK_SPEED 24000000
-#define I2C_SPEED 400000
+#define I2C_SPEED 500000
 
 //Addresses
 #define GEN_CALL 0x00
@@ -44,7 +44,7 @@ uint8_t hal_init() {
 
 	UCB0CTLW0 |= UCSWRST;                          // put eUSCI_B in reset state
 	UCB0CTLW0 &= ~UCSSEL_2;
-	UCB0CTLW0 |= (UCMODE_3 | UCMST | UCTR | UCSSEL_1); // I2C master mode, SMCLK
+	UCB0CTLW0 |= (UCMODE_3 | UCMST | UCTR | UCSSEL_2); // I2C master mode, SMCLK
 	UCB0BRW = CLOCK_SPEED / I2C_SPEED;        // baudrate = SMCLK /400,000
 	UCB0CTLW0 &= ~UCSWRST;                            // clear reset register
 	return 0;
@@ -111,7 +111,7 @@ uint8_t hal_resetAllDevices() {
 		return ADDR_REJECTED;
 	}
 	else {
-		return NO_RESPONSE; // uh-oh!
+		return NO_RESPONSE; // uh-oh
 	}
 }
 
@@ -176,7 +176,15 @@ uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret_val) {
 	txPtr = txData;
 	*txPtr = reg;
 	rxPtr = rxData;
-	configure_i2c(1);
+
+	UCB0CTLW0 |= UCSWRST;
+
+	UCB0CTLW0 |= UCTR;
+	UCB0CTLW1 &= ~UCASTP_3;
+	UCB0CTLW1 |= UCASTP_1;
+	UCB0TBCNT = 1;
+
+	UCB0CTLW0 &= ~UCSWRST;
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE | UCBCNTIE;
 
 	byte_count = 0;
@@ -256,57 +264,3 @@ __interrupt void euscib0_isr(void) {
 		break;
 	}
 }
-
-
-/*
- * hal.c
- *
- *  Created on: Dec 3, 2015
- *      Author: Berry_Admin
- *
-
-#include "hal.h"
-
-
-// simulate values in devices
-#define MAX_DEVICES 19
-static int devValues[MAX_DEVICES] =
-	{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 };
-
-//Initialize the data bus
-uint8_t hal_init() {
-	return 0;
-}
-
-//Discover new device, return 0 on accept, 1 on no response, 3 on reject
-uint8_t hal_discoverNewDevice(uint8_t new_address) {
-	// simulate finding 3 devices
-	static int i = 0;
-	i++;
-	if (i < 4) {
-		return 0;
-	}
-	else if (i >= 4) {
-		i = 0;
-	}
-
-	return 1;
-}
-
-//Return 0 on ping success, 1 on ping failure
-uint8_t hal_pingDevice(uint8_t address) {
-	return 0;
-}
-
-uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg,
-		uint8_t value) {
-	devValues[address-1] = value;
-	return 0;
-}
-
-// store the value in the parameter value
-uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* value) {
-	*value = devValues[address-1];
-	return 0;
-}
-*/

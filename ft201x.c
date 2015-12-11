@@ -301,7 +301,7 @@ void USBInEvent() {
 			reportError("IOgetc USBInEvent err", SYS_ERR_IOBUFFER);
 			handleError();
 		}
-		LED1_TOGGLE;
+//		LED1_TOGGLE;
 
 		// receive message FSM:
 		switch (state) {

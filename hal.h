@@ -8,8 +8,6 @@
 #ifndef HAL_H_
 #define HAL_H_
 
-#include <stdint.h>
-
 #define SCL_PIN BIT7
 #define SDA_PIN BIT6
 
