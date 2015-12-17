@@ -25,14 +25,14 @@
  */
 
 // TODO's:
-// Keep searching for bugs in ported over master code
+// Add back in ERROR2 for initialization code.
+// Do better error handling in handleError
+// Fix up ft201x code
+// Add in threading
 // Add in SPI init code for radio
 // Fix ft201x hardware interrupt - it is always pulling the line low, even
 //   after we empty the hardware buffers (which should let the line float high)
 
-// TODO: COULD USE ENTIRE LENGTH OF MESSAGE (ALL 64 BYTES) FOR DEBUG MESSAGE
-// SO THE LENGTH IS THE SAME EVERY TIME - THIS WILL SIMPLIFY PRINTING DEBUG OR
-// ERROR MESSAGES ON THE MASTER
 
 // Standard includes
 #include <msp430.h>
@@ -99,7 +99,10 @@ int main(void) {
 		}
 		else if (sys_event & USB_O_EVENT) {
 			sys_event &= ~USB_O_EVENT;
-			USBOutEvent();
+			if (USBOutEvent()) {
+				// We're not finished, queue up this event again.
+				sys_event |= USB_O_EVENT;
+			}
 		}
 		else if (sys_event & SERVER_EVENT) {
 //			reportError("server event", 24); // just for debugging

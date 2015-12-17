@@ -9,7 +9,7 @@
 // Global function prototypes
 int ft201x_init();
 void ft201x_close();
-void ft201x_i2c_write(char*, int16_t);
+void ft201x_i2c_write();
 int ft201x_i2c_read(int16_t);
 int ft201x_flushBuffers();
 void USBInEvent();

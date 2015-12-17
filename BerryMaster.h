@@ -96,7 +96,7 @@ enum SYS_ERRORS {
 #define NULL 0
 
 // Device register mapping:
-#define MAX_VALS 3 // the max number of value registers in a device
+#define MAX_VALS 4 // the max number of value registers (1 byte ea) in a device
 
 // General registers
 #define REG_TYPE 0
@@ -106,7 +106,8 @@ enum SYS_ERRORS {
 #define REG_LED0 2
 #define REG_LED1 3
 #define REG_LED2 4
-#define NUM_LEDS 3
+#define REG_LED3 5
+#define NUM_LEDS 4
 
 // Button device
 #define REG_BTN 2
@@ -117,7 +118,6 @@ enum SYS_ERRORS {
 #define TYPE_LED 2
 #define TYPE_SW 6
 #define TYPE_BUTTON 6
-extern const char* typeStrings[];
 
 // Errors
 #define NETWORK_FULL		255
@@ -162,7 +162,7 @@ typedef struct DeviceList {
 } DeviceList_t;
 
 /******************************************************************************
- master API function prototypes ***********************************************
+ * master API function prototypes *********************************************
  *****************************************************************************/
 
 /* connectToMaster
@@ -223,9 +223,9 @@ void clearNetwork();
  * (all other addresses are not configured)
  */
 
-/*
- * Other function prototypes
- */
+/******************************************************************************
+ * Other function prototypes **************************************************
+ *****************************************************************************/
 
 /* reportError
  * prints an error message and number to the console

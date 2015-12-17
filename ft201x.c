@@ -188,18 +188,30 @@ int ft201x_i2c_start_address(uint8_t address) {
 }
 
 //*****************************************************************************
-//	Write a number of bytes to the FT201X over I2C
+//	Write entire output io buffer to the FT201X over I2C
 //
-void ft201x_i2c_write(char* data, int16_t bytes) {
-	int error;
-	if ((error = ft201x_i2c_start_address(FT201X_WRITE_ADDR)))// output write address
+void ft201x_i2c_write() {
+	int error, bytes;
+	char c;
+
+	// Output write address
+	if ((error = ft201x_i2c_start_address(FT201X_WRITE_ADDR)))
 		longjmp(usb_i2c_context, error);
 
-	while (bytes--)									// write 8 bits
-		if ((error = ft201x_i2c_out8bits(*data++)))
-			longjmp(usb_i2c_context, error);		//return error
-	ft201x_i2c_out_stop();							// output stop
-	return;											// return success
+	// Write entire output io buffer to usb
+	bytes = io_usb_out->count;
+	while (bytes--) {
+		// get character from io buffer
+		if (error = IOgetc(&c, io_usb_out)) {
+			longjmp(usb_i2c_context, error); // return error
+		}
+		// write 8 bits
+		if ((error = ft201x_i2c_out8bits((uint8_t)c))) {
+			longjmp(usb_i2c_context, error); //return error
+		}
+	}
+	ft201x_i2c_out_stop(); // output stop
+	return;	// return success
 }
 
 //*****************************************************************************
@@ -275,7 +287,7 @@ void USBInEvent() {
 	}
 
 	// Read input characters from computer into io_usb_in
-	if (!(err = setjmp(usb_i2c_context))) {
+	if (!(err = _setjmp(usb_i2c_context))) {
 		// todo: I need to fix ft201x_i2c_read so I can read multiple bytes
 		// Read 1 byte until there are no more bytes to be read
 		while(!ft201x_i2c_read(1)) bytesRead++;
@@ -360,32 +372,23 @@ void USBInEvent() {
 
 }
 
-// Output the out buffer to the usb
+// Write the output io buffer to the usb
 int USBOutEvent() {
-#define BUF_SIZE MAX_MSG_LENGTH
-	int i; // byte count
-	char buf[BUF_SIZE]; // out buffer (double buffering is inefficient here...)
+	int err;
 
-	// Copy from IOBuffer into our temp buffer
-	// (TODO: make this direct in ft201x write)
-	for (i = 0; i < BUF_SIZE; ++i) {
-		if (IOgetc(buf + i, io_usb_out)) {
-			break;
-		}
-	}
-
-	// Write the temp buffer out to USB (to computer)
-	if (i) {
-		// todo: do a setjmp here
-//		LED1_ON;
-		ft201x_i2c_write(buf, i);
-//		LED1_OFF;
+	// set context restore point
+	if (!(err = _setjmp(usb_i2c_context))) {
+		// write buffer out to usb
+		ft201x_i2c_write();
+	} else {
+		// Error!
+		// todo: Is there any way to handle this better?
+		return err;
 	}
 
 	// If we haven't read everything out of the buffer yet,
 	// come back to this event.
-	if (i==BUF_SIZE) {
-		sys_event |= USB_O_EVENT; // queue up this event again
+	if (io_usb_out->count) {
 		return -1; // signal that we're not done yet
 	}
 	return 0; // done with the buffer

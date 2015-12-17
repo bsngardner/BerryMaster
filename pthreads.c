@@ -32,7 +32,6 @@ volatile pthread_t ctid;					// current task id
 extern int __STACK_SIZE;					// --stack_size=xxx
 extern char* __STACK_END;					// top of stack
 
-
 //*******************************************************************************
 //--init TimerA for context switching--------------------------------------------
 //

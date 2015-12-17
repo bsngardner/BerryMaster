@@ -11,8 +11,15 @@
 #include "ft201x.h"
 #include <msp430.h>
 
-// Global variables
-char sentMessage[MAX_MSG_LENGTH];
+// ----------------------------------------------------------------------------
+// Global variables -----------------------------------------------------------
+// ----------------------------------------------------------------------------
+
+// The buffer to receive a message from the host.
+uint8_t sentMessage[MAX_MSG_LENGTH];
+
+// A signal for the sentMessage buffer - if FALSE, the buffer is open for
+// writing; if TRUE, the buffer is locked and we have received a full message.
 volatile int buffLocked = FALSE;
 
 // ----------------------------------------------------------------------------
@@ -32,7 +39,7 @@ void rpc_getDeviceValue(uint8_t* message, uint8_t len);
 
 void rpc_setDeviceValue(uint8_t* message, uint8_t len);
 
-int recv_request(uint8_t* message);
+int recv_request();
 int send_reply(uint8_t* message, int size);
 
 /*
@@ -52,21 +59,19 @@ uint16_t getUInt16(uint8_t* message, int offset);
 // ----------------------------------------------------------------------------
 int serverEvent() {
 
-	static uint8_t message[MAX_MSG_LENGTH];
 	static uint8_t len;
 	static uint8_t opcode;
 
 	// get the message:
-	if (recv_request(message) == MSG_NOT_SENT_YET) {
-		// todo: error! shouldn't service this event until the message
-		// has been received
-		// I should be able to call my reportError function here...
-		handleError();
+	if (recv_request() == MSG_NOT_SENT_YET) {
+		// Error! Shouldn't service this event until the message has been rxed
+		reportError("recv_request err", RECV_REQ_ERROR);
+		handleError(); // todo: do this better
 	}
 
 	// get the length and opcode
-	len = message[0];
-	opcode = message[1];
+	len = sentMessage[0];
+	opcode = sentMessage[1];
 
 	// todo: use len to error check.
 
@@ -74,19 +79,19 @@ int serverEvent() {
 	switch(opcode) {
 	case OPCODE_INIT_DEVICES:
 		// init the network (also sends a reply to the host)
-		rpc_initDevices(message, len);
+		rpc_initDevices(sentMessage, len);
 		break;
 	case OPCODE_GET_DEVICE_TYPE:
 		// get the device type (this also sends a reply to the host)
-		rpc_getDeviceType(message, len);
+		rpc_getDeviceType(sentMessage, len);
 		break;
 	case OPCODE_GET_DEVICE_VALUE:
 		// Get the specified register value in the berry.
-		rpc_getDeviceValue(message, len);
+		rpc_getDeviceValue(sentMessage, len);
 		break;
 	case OPCODE_SET_DEVICE_VALUE:
 		// Set the specified register value in the berry.
-		rpc_setDeviceValue(message, len);
+		rpc_setDeviceValue(sentMessage, len);
 		break;
 	default:
 		break;
@@ -175,13 +180,10 @@ void rpc_setDeviceValue(uint8_t* message, uint8_t len) {
 // @return RECV_REQ_SUCCESS = 0: successfully received message
 // 		   RECV_REQ_ERROR = 1: error in receiving the message
 //         MSG_NOT_SENT_YET = 2: haven't finished receiving the message yet
-int recv_request(uint8_t* message) {
+int recv_request() {
 	// Has a message finished sending yet? (recv buffer is locked)
 	if (buffLocked == TRUE) {
-		// yes, copy the message, unlock the buffer, and return success
-		memcpy((uint8_t*)message, (uint8_t*)sentMessage,
-				((int) sentMessage[0]) + 1);
-		buffLocked = FALSE;
+		// yes, return success
 		return RECV_REQ_SUCCESS;
 	}
 	else {
@@ -201,6 +203,8 @@ int send_reply(uint8_t* message, int replyLength) {
 			// obviously can't send a message...
 		}
 	}
+	// unlock the buffer so we can receive another message
+	buffLocked = FALSE;
 	return 0; // success
 }
 
