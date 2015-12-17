@@ -80,7 +80,8 @@ enum SYS_ERRORS {
 	SYS_ERR_EVENT,			// 6 event error
 	SYS_ERR_ISR,			// 7 unrecognized interrupt
 	SYS_ERR_IOBUFFER,		// 8 iobuffer error
-	SYS_ERR_RX_HOST_MSG		// 9 error receiving message from host
+	SYS_ERR_RX_HOST_MSG,	// 9 error receiving message from host
+	SYS_ERR_MALLOC			// 10 error using malloc
 };
 
 // Events
