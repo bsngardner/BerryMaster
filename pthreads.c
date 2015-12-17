@@ -31,6 +31,7 @@ volatile pthread_t ctid;					// current task id
 
 extern int __STACK_SIZE;					// --stack_size=xxx
 extern char* __STACK_END;					// top of stack
+//extern void TA_isr();
 
 //*******************************************************************************
 //--init TimerA for context switching--------------------------------------------
@@ -326,3 +327,9 @@ int semaphore_create(sem_t* sem,			// ptr to semaphore struct
 	sem->tid = ctid;						// tid of creating thread
 	return 0;
 } // end semaphore_create
+
+//#pragma vector=TIMER0_A0_VECTOR
+//__interrupt void Timer_A (void) {
+//	TA_isr();
+//	return;
+//}

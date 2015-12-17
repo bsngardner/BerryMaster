@@ -269,7 +269,7 @@ int ft201x_i2c_read(int bytes) {
 void USBInEvent() {
 	int err = 0;
 	char data = 0;
-	int bytesRead = 0;
+	static int bytesRead;
 
 	// receive message FSM vars
 	static enum states_e { getSize, getMsg } state = getSize;
@@ -287,15 +287,14 @@ void USBInEvent() {
 	}
 
 	// Read input characters from computer into io_usb_in
+	bytesRead = 0;
 	if (!(err = _setjmp(usb_i2c_context))) {
 		// todo: I need to fix ft201x_i2c_read so I can read multiple bytes
 		// Read 1 byte until there are no more bytes to be read
 		while(!ft201x_i2c_read(1)) bytesRead++;
 	} else {
-		// Error! The error value is the var err
-		// todo: for now, I'll echo the error;
-		// later I want to handle this differently
-		IOputc((char)(err+ASCII_ZERO), io_usb_out);
+		// Error!
+		// todo: How do I handle this?
 		return;
 	}
 
@@ -321,7 +320,7 @@ void USBInEvent() {
 			// is the buffer locked?
 			if (buffLocked == FALSE) {
 				// no, get number of bytes of the message
-				msgBytesLeft = (int)(data); // todo: check this!!!
+				msgBytesLeft = (int)(data);
 				// put into buffer:
 				sentMessage[0] = data;
 

@@ -25,10 +25,10 @@
             .cdecls C,"pthreads.h"			; threads header
             .cdecls C,"BerryMaster.h"
 
-			.def	TA_isr
+			;.def	TA_isr
 			.ref	ctid
 			.ref	tcbs
-			;.ref	handleError ;ERROR2
+			;.ref	ERROR2
 
 STACK_OVERFLOW_CHECK	.equ	1
 _SYS					.equ	1
@@ -68,7 +68,7 @@ TA_isr:     bic.w   #TAIFG|TAIE,&TA0CTL		; acknowledge & disable TA interrupt
 			  jlo	TA_isr_02				; n
 			;mov.w	#_SYS,r12				; y
 			;mov.w	#_ERR_STACK,r13
-			call	#handleError			; ERROR2(_SYS, _ERR_STACK);
+			call	#handleError;#ERROR2	; ERROR2(_SYS, _ERR_STACK);
 			.endif
 
 TA_isr_02:	mov.w	#MAX_THREADS,r5			; limit search
@@ -108,6 +108,6 @@ TA_isr_08:	mov.w	tcb_stack(r4),SP		; schedule thread
 			reti
 
 ; Interrupt Vector --------------------------------------------------------
-            .sect   ".int08"                ; timer A section
+            .sect   ".int44"                ; timer A section
             .word   TA_isr                  ; timer A isr
             .end

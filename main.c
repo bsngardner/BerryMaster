@@ -44,6 +44,7 @@
 #include "IObuffer.h"
 #include "i2c.h"
 #include "server.h"
+#include "pthreads.h"
 
 // Macros
 #define WDT_CLKS_PER_SEC	512				// 512 Hz WD clock (@32 kHz)
@@ -56,12 +57,15 @@
 static int WDT_init();
 static int setClock();
 static int msp430init();
+static int threadsInit();
 
 // Global Variables
 static volatile int WDT_cps_cnt;
 static volatile int usb_poll_cnt;
 static volatile int debounceCnt;
 volatile uint16_t sys_event;
+pthread_t pthreadHandle_server;
+pthread_t pthreadHandle_streamer;
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
 
@@ -76,6 +80,14 @@ int main(void) {
 		// error initializing the board - spin in an idle loop
 		while(1) handleError();
 	}
+
+	// initialize threads
+	if (threadsInit()) {
+		while(1) handleError();
+	}
+
+    // Enable global interrupts after all initialization is finished.
+    __enable_interrupt();
 
 	// Wait for an interrupt
     while(1) {
@@ -210,9 +222,28 @@ static int msp430init() {
     	return err;
     }
 
-    // Enable global interrupts
-    __enable_interrupt();
+	return 0;
+}
 
+// Initialize pthreads. Main is the server thread.
+// Create a streamer thread.
+// Create and initialize any mutexes.
+// Return 0 if successful, nonzero if failed.
+static int threadsInit() {
+	int error;
+
+	// Initialize pthreads. Use defaults (NULL argument).
+	if (error = pthread_init(NULL)) {
+		reportError("Error initializing pthreads", error);
+		return error;
+	}
+
+	// Create server and streamer threads
+	pthreadHandle_server = pthread_self();
+//	if (error = pthread_create(&pthreadHandle_streamer, NULL,
+//			streamerThread, NULL)) {
+//
+//	}
 	return 0;
 }
 
@@ -245,7 +276,7 @@ void handleError() {
 	volatile int j = 0;
 #define DELAY -30000
 #define DELAY2 5
-	// todo: I don't know what to do if this happens besides blink LEDs
+	// todo: I don't know what to do besides blink LEDs.
 	// I may want to do some kind of system reset.
 	// Include some close functions on the various peripherals, make sure
 	// that I free memory
@@ -253,6 +284,7 @@ void handleError() {
 	__disable_interrupt(); // Disable interrupts
 	WDTCTL = WDTPW | WDTHOLD; // Turn off watchdog
 	ft201x_close();
+	// todo: pthread_join(pthreadHandle_streamer);
 
 	// Loop forever - short delay between toggling LEDs
 	LED0_OFF;
@@ -294,7 +326,8 @@ __interrupt void WDT_ISR(void) {
 		// Yes; are we finished?
 		--debounceCnt;
 		if (debounceCnt == 0) {
-			// TODO: Signal button event.
+			// Toggle LED1. At a later time, we may want
+			// to signal some kind of button event.
 			LED1_TOGGLE;
 		}
 	}
