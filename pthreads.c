@@ -39,7 +39,7 @@ extern char* __STACK_END;					// top of stack
 int timerA_init(void)
 {
 	TA0R = 0;								// reset timerA
-	TA0CTL = TA_CTL;							// set timerA control reg
+	TA0CTL = TA_CTL;						// set timerA control reg
 	TA0CCR0 = TA_FREQ;						// set interval (frequency)
 	return 0;
 } // end timerA_init
@@ -64,7 +64,13 @@ int pthread_init(pthread_attr_t* parms)
 	__disable_interrupt();					// ** INTERRUPTS MUST BE DISABLED **
 	memset(tcbs, 0, sizeof(tcbs));			// clear tcb's
 	ctid = 0;								// thread 0
-	tcbs[ctid].thread = (void*)(__STACK_END - (parms ? parms->stack_size : __STACK_SIZE));
+//	tcbs[ctid].thread = (void*)(__STACK_END - (parms ? parms->stack_size : __STACK_SIZE));
+#if 0
+	long temp = (0x2000 - (parms ? parms->stack_size : 0x8c));
+	tcbs[ctid].thread = (void*)temp;
+#else
+	tcbs[ctid].thread = (void*)((long)__STACK_END - (parms ? parms->stack_size : (long)__STACK_SIZE));
+#endif
 	init_stack(tcbs[ctid].thread, (int)__get_SP_register() - (int)tcbs[ctid].thread - 2);
 	tcbs[ctid].stack = (void*)(__get_SP_register() + 2);
 	timerA_init();							// start scheduling clock

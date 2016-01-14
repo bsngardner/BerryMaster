@@ -58,6 +58,7 @@ static int WDT_init();
 static int setClock();
 static int msp430init();
 static int threadsInit();
+static void* streamerThread(void*);
 
 // Global Variables
 static volatile int WDT_cps_cnt;
@@ -68,6 +69,13 @@ pthread_t pthreadHandle_server;
 pthread_t pthreadHandle_streamer;
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
+
+static void* streamerThread(void* a) {
+	volatile int i = 0;
+	while(1) {
+		i++;
+	}
+}
 
 /*
  * main.c
@@ -240,10 +248,11 @@ static int threadsInit() {
 
 	// Create server and streamer threads
 	pthreadHandle_server = pthread_self();
-//	if (error = pthread_create(&pthreadHandle_streamer, NULL,
-//			streamerThread, NULL)) {
-//
-//	}
+	if (error = pthread_create(&pthreadHandle_streamer, NULL,
+			streamerThread, NULL)) {
+		reportError("Error creating streamer thread", error);
+		return error;
+	}
 	return 0;
 }
 
