@@ -108,6 +108,6 @@ TA_isr_08:	mov.w	tcb_stack(r4),SP		; schedule thread
 			reti
 
 ; Interrupt Vector --------------------------------------------------------
-     ;       .sect   ".int44"                ; timer A section
-     ;       .word   TA_isr                  ; timer A isr
+            .sect   ".int44"                ; timer A section
+            .word   TA_isr                  ; timer A isr
             .end

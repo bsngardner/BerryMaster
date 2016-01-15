@@ -65,7 +65,7 @@ int pthread_init(pthread_attr_t* parms)
 	memset(tcbs, 0, sizeof(tcbs));			// clear tcb's
 	ctid = 0;								// thread 0
 //	tcbs[ctid].thread = (void*)(__STACK_END - (parms ? parms->stack_size : __STACK_SIZE));
-#if 0
+#if 1
 	long temp = (0x2000 - (parms ? parms->stack_size : 0x8c));
 	tcbs[ctid].thread = (void*)temp;
 #else

@@ -58,7 +58,7 @@ static int WDT_init();
 static int setClock();
 static int msp430init();
 static int threadsInit();
-static void* streamerThread(void*);
+static void* streamerThread();
 
 // Global Variables
 static volatile int WDT_cps_cnt;
@@ -70,7 +70,7 @@ pthread_t pthreadHandle_streamer;
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
 
-static void* streamerThread(void* a) {
+static void* streamerThread() {
 	volatile int i = 0;
 	while(1) {
 		i++;
