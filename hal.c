@@ -110,6 +110,7 @@ uint8_t hal_resetAllDevices() {
 	if (status == NACK) {
 		return ADDR_REJECTED;
 	}
+	return 0;
 }
 
 // Sends 0x01 to device address, returns 0 if device ACKed, 1 if NACK
