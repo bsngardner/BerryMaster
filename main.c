@@ -52,11 +52,6 @@ static int WDT_init();
 static int setClock();
 static int msp430init();
 
-// Global Variables
-static volatile int WDT_cps_cnt;
-static volatile int usb_poll_cnt;
-static volatile int debounceCnt;
-static volatile int hal_cnt = HAL_COUNT;
 
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
@@ -65,7 +60,6 @@ extern uint16_t i2c_fSCL; // i2c timing constant
  * main.c
  */
 int main(void) {
-	int numEventErrors = 0;
 
 	// initialize the board
 	if (msp430init()) {

@@ -39,4 +39,7 @@ extern uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg,
 extern uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg,
 		uint8_t* ret_val);
 
+extern uint8_t hal_getDeviceMultipleRegisters(uint8_t address, uint8_t reg,
+		uint8_t* ret_val, uint8_t count);
+
 #endif /* HAL_H_ */

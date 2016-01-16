@@ -7,6 +7,7 @@
 
 #ifndef EVENTS_H_
 #define EVENTS_H_
+#include <stdint.h>
 
 //Defines
 // Events
@@ -25,7 +26,12 @@
 #define TEST_COUNT	50
 
 //Extern variables
-extern volatile int sys_event;
+extern volatile uint16_t sys_event;
+//WDT
+extern volatile int WDT_cps_cnt;
+extern volatile int usb_poll_cnt;
+extern volatile int debounceCnt;
+extern volatile int hal_cnt;
 
 //Functions
 extern void event_loop();

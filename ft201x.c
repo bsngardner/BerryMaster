@@ -14,6 +14,7 @@
 #include <setjmp.h>
 #include "BerryMaster.h"
 #include "ft201x.h"
+#include "events.h"
 
 // Global variables
 jmp_buf usb_i2c_context;	// error context
@@ -221,8 +222,7 @@ int ft201x_i2c_read(int bytes) {
 	// TODO: when there is a CBUS pin
 	while (bytes--)								// read 8 bits
 	{
-		for (i = 8; i > 0; i--)
-		{
+		for (i = 8; i > 0; i--) {
 			FT201X_I2C_CLOCK_LOW;	// I2C_CLOCK_LOW;
 			FT201X_I2C_DATA_HIGH;	// high impedance
 			FT201X_I2C_CLOCK_HIGH;	// I2C_CLOCK_HIGH;
@@ -231,8 +231,7 @@ int ft201x_i2c_read(int bytes) {
 				data++;
 		}
 		// save data
-		if (error = IOputc(data, io_usb_in))
-		{
+		if (error = IOputc(data, io_usb_in)) {
 			ft201x_i2c_out_stop();
 			longjmp(usb_i2c_context, error);
 		}
@@ -259,7 +258,9 @@ void USBInEvent() {
 	int bytesRead = 0;
 
 	// receive message FSM vars
-	static enum states_e { getSize, getMsg } state = getSize;
+	static enum states_e {
+		getSize, getMsg
+	} state = getSize;
 
 	// private message size variable
 	static int msgBytesLeft = 0;
@@ -277,12 +278,13 @@ void USBInEvent() {
 	if (!(err = setjmp(usb_i2c_context))) {
 		// todo: I need to fix ft201x_i2c_read so I can read multiple bytes
 		// Read 1 byte until there are no more bytes to be read
-		while(!ft201x_i2c_read(1)) bytesRead++;
+		while (!ft201x_i2c_read(1))
+			bytesRead++;
 	} else {
 		// Error! The error value is the var err
 		// todo: for now, I'll echo the error;
 		// later I want to handle this differently
-		IOputc((char)(err+ASCII_ZERO), io_usb_out);
+		IOputc((char) (err + ASCII_ZERO), io_usb_out);
 		return;
 	}
 
@@ -301,6 +303,8 @@ void USBInEvent() {
 			handleError();
 		}
 		LED1_TOGGLE;
+		IOputc(data, io_usb_out);
+		continue;
 
 		// receive message FSM:
 		switch (state) {
@@ -308,7 +312,7 @@ void USBInEvent() {
 			// is the buffer locked?
 			if (buffLocked == FALSE) {
 				// no, get number of bytes of the message
-				msgBytesLeft = (int)(data); // todo: check this!!!
+				msgBytesLeft = (int) (data); // todo: check this!!!
 				// put into buffer:
 				sentMessage[0] = data;
 
@@ -344,18 +348,17 @@ void USBInEvent() {
 		} // end state machine
 	}
 
-
 	/*
-	// just for testing - echo the rxed char.
-	char c;
-	// Try to read a character from io_usb_in
-	if (IOgetc(&c, io_usb_in) == 0) {
-		// Got it. Now try to put it into io_usb_out.
-		if (IOputc(c, io_usb_out) != 0) {
-			// error
-		}
-	}
-	*/
+	 // just for testing - echo the rxed char.
+	 char c;
+	 // Try to read a character from io_usb_in
+	 if (IOgetc(&c, io_usb_in) == 0) {
+	 // Got it. Now try to put it into io_usb_out.
+	 if (IOputc(c, io_usb_out) != 0) {
+	 // error
+	 }
+	 }
+	 */
 
 }
 
@@ -383,7 +386,7 @@ int USBOutEvent() {
 
 	// If we haven't read everything out of the buffer yet,
 	// come back to this event.
-	if (i==BUF_SIZE) {
+	if (i == BUF_SIZE) {
 		sys_event |= USB_O_EVENT; // queue up this event again
 		return -1; // signal that we're not done yet
 	}

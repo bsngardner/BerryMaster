@@ -5,11 +5,25 @@
  *      Author: Broderick
  */
 
+#include "msp430.h"
 #include "events.h"
+#include "BerryMaster.h"
+#include <stdint.h>
+#include "hal.h"
+#include "ft201x.h"
+#include "server.h"
+#include "ioprintf.h"
 
 volatile uint16_t sys_event;
 
+// Global Variables
+volatile int WDT_cps_cnt;
+volatile int usb_poll_cnt;
+volatile int debounceCnt;
+volatile int hal_cnt = TEST_COUNT;
+
 void event_loop() {
+	int numEventErrors = 0;
 	// Wait for an interrupt
 	while (1) {
 		// disable interrupts before check sys_event
@@ -74,6 +88,7 @@ uint8_t new = 0;
 uint8_t reset = 0;
 
 void test_event() {
+	iofprintf(io_usb_out, "Listen!\n\r");
 	if (!reset) {
 		hal_resetAllDevices();
 		reset = 1;
@@ -93,7 +108,7 @@ void test_event() {
 			hal_setDeviceRegister(devices[new].addr, 3, 0);
 			hal_setDeviceRegister(devices[new].addr, 4, 0);
 			hal_setDeviceRegister(devices[new].addr, 5, 0);
-			devices[new].reg = devices[new].addr + 2;
+			devices[new].reg = devices[new].addr + 1;
 			break;
 		}
 		for (i = 0; i < 8; i++) {
@@ -104,7 +119,7 @@ void test_event() {
 		}
 		addr++;
 	}
-
+	uint8_t buffer[128] = { 0 };
 	for (i = 0; i < 8; i++) {
 
 		if (devices[i].addr) {
@@ -116,6 +131,10 @@ void test_event() {
 					devices[i].val ^= 0x01;
 					hal_setDeviceRegister(devices[i].addr, devices[i].reg,
 							devices[i].val);
+					hal_getDeviceMultipleRegisters(devices[i].addr, 6, buffer,
+							1);
+					iofprintf(io_usb_out, "From device %d: %s\n\r",
+							devices[i].addr, buffer);
 					break;
 				case SW_T:
 					hal_getDeviceRegister(devices[i].addr, devices[i].reg,
@@ -131,6 +150,7 @@ void test_event() {
 			}
 		}
 	}
+	LED1_OFF;
 }
 
 //-----------------------------------------------------------------------------
@@ -143,6 +163,7 @@ __interrupt void WDT_ISR(void) {
 		hal_cnt = TEST_COUNT;
 		sys_event |= TEST_EVENT;
 		__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
+		LED1_ON;
 	}
 
 	--WDT_cps_cnt;

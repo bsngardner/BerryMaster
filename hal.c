@@ -167,6 +167,7 @@ uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg, uint8_t value) {
 	}
 	return 1;
 }
+
 //Stores data from device (@address) register (reg) in variable (ret_val)
 uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret_val) {
 
@@ -185,8 +186,7 @@ uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret_val) {
 	UCB0CTLW0 &= ~UCSWRST;
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE | UCBCNTIE;
 
-	byte_count = 0;
-	load_byte_count = 1;
+	byte_count = 1;
 	vineSleep = 1;
 	status = DATA;
 	UCB0CTLW0 |= UCTXSTT;
@@ -199,6 +199,42 @@ uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret_val) {
 	}
 	if (status == STOP) {
 		*ret_val = rxData[0];
+		return SUCCESS;
+	}
+	return 3;
+}
+
+//Stores data from device (@address) register (reg) in variable (ret_val)
+uint8_t hal_getDeviceMultipleRegisters(uint8_t address, uint8_t reg,
+		uint8_t* ret, uint8_t count) {
+
+	UCB0I2CSA = address;
+	txPtr = txData;
+	*txPtr = reg;
+	rxPtr = ret;
+
+	UCB0CTLW0 |= UCSWRST;
+
+	UCB0CTLW0 |= UCTR;
+	UCB0CTLW1 &= ~UCASTP_3;
+	UCB0CTLW1 |= UCASTP_1;
+	UCB0TBCNT = 1;
+
+	UCB0CTLW0 &= ~UCSWRST;
+	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE | UCBCNTIE;
+
+	byte_count = count;
+	vineSleep = 1;
+	status = DATA;
+	UCB0CTLW0 |= UCTXSTT;
+
+	while (vineSleep)
+		LPM0;
+
+	if (status == NACK) {
+		return NO_RESPONSE;
+	}
+	if (status == STOP) {
 		return SUCCESS;
 	}
 	return 3;
@@ -242,21 +278,16 @@ __interrupt void euscib0_isr(void) {
 		UCB0TXBUF = *txPtr++;
 		break;
 	case RX0_IV:
+		if (byte_count && !(--byte_count)) {
+			UCB0CTLW0 |= UCTXSTP;
+		}
 		*rxPtr++ = UCB0RXBUF;
 		break;
 	case BCNT_IV:
-		UCB0IFG &= ~UCBCNTIFG;
-		if (byte_count) {
-			if (!(--byte_count)) {
-				UCB0CTLW0 |= UCTXSTP;
-			}
-		} else {
-			byte_count = load_byte_count;
-			UCB0CTLW0 &= ~UCTR;
-			UCB0IE &= ~UCTXIE0;
-			UCB0IE |= UCRXIE0;
-			UCB0CTLW0 |= UCTXSTT;
-		}
+		UCB0CTLW0 &= ~UCTR;
+		UCB0IE &= ~(UCTXIE0 | UCBCNTIE);
+		UCB0IE |= UCRXIE0;
+		UCB0CTLW0 |= UCTXSTT;
 		break;
 	default:
 		break;
