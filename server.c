@@ -71,15 +71,13 @@ int serverEvent() {
 	// get the message:
 	if (recv_request() == MSG_NOT_SENT_YET) {
 		// Error! Shouldn't service this event until the message has been rxed
-		reportError("recv_request err", RECV_REQ_ERROR);
+		reportError("recv_request err", RECV_REQ_ERROR, io_usb_out);
 		handleError(); // todo: do this better
 	}
 
-	// get the length and opcode
+	// get the length and opcode; todo: use len to error check.
 	len = sentMessage[0];
 	opcode = sentMessage[1];
-
-	// todo: use len to error check.
 
 	// handle the request:
 	switch(opcode) {
@@ -109,9 +107,12 @@ int serverEvent() {
 // calls master initDevices function
 // and sends a reply back to the host
 void rpc_initDevices(uint8_t* message, uint8_t len) {
+	// Call init devices
 	pthread_mutex_lock(&vineMutex);
 	uint8_t result = initDevices();
 	pthread_mutex_unlock(&vineMutex);
+
+	// Send reply
 	uint8_t length = STD_REPLY_LENGTH;
 	message[OFFSET_LENGTH] = length;
 	message[OFFSET_TYPE] = TYPE_REPLY;

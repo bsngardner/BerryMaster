@@ -99,9 +99,9 @@ int ft201x_init() {
 		// Error creating the IO buffer
 		return SYS_ERR_430init;
 	}
-	io_usb_in->bytes_ready = NULL; // not using a callback for now
+	io_usb_in->bytes_ready = NULL; // no callback function
 
-	ft201x_flushBuffers(); // flush the tx and rx buffers
+	ft201x_flushBuffers(); // flush the tx and rx buffers on ft201x chip
 
 	// return success
 	return 0;
@@ -190,7 +190,7 @@ int ft201x_i2c_start_address(uint8_t address) {
 //*****************************************************************************
 //	Write entire output io buffer to the FT201X over I2C
 //
-void ft201x_i2c_write() {
+void ft201x_i2c_write(IObuffer* buff) {
 	int error, bytes;
 	char c;
 
@@ -199,10 +199,10 @@ void ft201x_i2c_write() {
 		longjmp(usb_i2c_context, error);
 
 	// Write entire output io buffer to usb
-	bytes = io_usb_out->count;
+	bytes = buff->count;
 	while (bytes--) {
 		// get character from io buffer
-		if (error = IOgetc(&c, io_usb_out)) {
+		if (error = IOgetc(&c, buff)) {
 			longjmp(usb_i2c_context, error); // return error
 		}
 		// write 8 bits
@@ -309,7 +309,7 @@ void USBInEvent() {
 		// Read the next char
 		if (err = IOgetc(&data, io_usb_in)) {
 			// Error getting character
-			reportError("IOgetc USBInEvent err", SYS_ERR_IOBUFFER);
+			reportError("IOgetc USBInEvent err", SYS_ERR_IOBUFFER, io_usb_out);
 			handleError();
 		}
 //		LED1_TOGGLE;
@@ -344,7 +344,8 @@ void USBInEvent() {
 				// We should have read the whole message by now - check
 				if (bytesRead != 0) {
 					// Host sent more data than it promised, error
-					reportError("Host msg err", SYS_ERR_RX_HOST_MSG);
+					reportError("Host msg err", SYS_ERR_RX_HOST_MSG,
+							io_usb_out);
 					handleError(); // spins in an infinite loop
 				}
 			}
@@ -371,14 +372,14 @@ void USBInEvent() {
 
 }
 
-// Write the output io buffer to the usb
-int USBOutEvent() {
+// Write the passed in io buffer to the usb
+int USBOutEvent(IObuffer* buff) {
 	int err;
 
 	// set context restore point
 	if (!(err = _setjmp(usb_i2c_context))) {
 		// write buffer out to usb
-		ft201x_i2c_write();
+		ft201x_i2c_write(buff);
 	} else {
 		// Error!
 		// todo: Is there any way to handle this better?

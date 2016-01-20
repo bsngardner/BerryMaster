@@ -11,6 +11,7 @@
 #define BERRYMASTER_H_
 
 #include <stdint.h>
+#include "IObuffer.h"
 
 // Hardware version
 #define MAMA_REV_A
@@ -190,17 +191,17 @@ int initDevices();
 /* getDeviceType
  * @param the address of the device
  * @param a pointer to store the type of the device at the specified address;
- * 	       notADevice (0) if device is not on network
+ * 	       unknown (0) if device is not on network
  * @return 0 for success; 1 if the device is not on the network.
  */
 int getDeviceType(uint8_t addr, uint8_t* deviceType);
 
 /* getDeviceValue
- * gets the value (or current state) of the device at the specified address
- * @param addr - the address of the device
- * @param value - a pointer to store the value
- * @param reg - the register to read
- * @return 0 if successful; 1 otherwise
+ * gets a value in the specified register of the device at the specified address
+ * @param the address of the device
+ * @param a pointer to store the value
+ * @param the register to read
+ * @return SUCCESS if successful, non-zero if failed
  */
 int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg);
 
@@ -231,8 +232,9 @@ void clearNetwork();
  * prints an error message and number to the console
  * @param msg - the error message to print
  * @param err - the error number to print
+ * @param buff - the buffer in which to put the message
  */
-void reportError(char* msg, int err);
+void reportError(char* msg, int err, IObuffer* buff);
 
 /*
  * spins in an infinite loop, toggling LEDs 0 and 1

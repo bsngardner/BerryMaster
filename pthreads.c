@@ -166,9 +166,10 @@ void pthread_exit(void* return_value)
 	uint16_t sr = __get_SR_register();
 	__disable_interrupt();
 //	if (tcbs[ctid].thread == 0) ERROR2(_USER, _ERR_THREADID);
-	if (tcbs[ctid].thread == 0)
-		reportError("Error in pthread_exit!", _ERR_THREADID);
-	handleError(); // todo: make a better error mechanism.
+	if (tcbs[ctid].thread == 0) {
+		//reportError("Err-pthread_exit!", _ERR_THREADID);
+		handleError(); // todo: make a better error mechanism.
+	}
 	free ((void*)tcbs[ctid].thread);
 	tcbs[ctid].thread = 0;
 	tcbs[ctid].retval = (int)return_value;

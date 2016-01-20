@@ -69,13 +69,16 @@ extern uint16_t i2c_fSCL; // i2c timing constant
 volatile uint16_t sys_event; // holds all events
 pthread_t pthreadHandle_server; // handle to server thread
 pthread_t pthreadHandle_streamer; // handle to streamer thread
-pthread_mutex_t vineMutex;
+pthread_mutex_t vineMutex; // mutex for the vine communication
+pthread_mutex_t hostMutex; // mutex for the host communication (USB)
 
 /*
  * main.c
  */
 int main(void) {
 	int numEventErrors = 0;
+
+	static int cnt = 0; // for debugging
 
 	// initialize the board
 	if (msp430init()) {
@@ -113,19 +116,25 @@ int main(void) {
 			}
 			else if (sys_event & USB_O_EVENT) {
 				sys_event &= ~USB_O_EVENT;
-				if (USBOutEvent()) {
+				if (USBOutEvent(io_usb_out)) {
 					// We're not finished, queue up this event again.
 					sys_event |= USB_O_EVENT;
 				}
 			}
 			else if (sys_event & SERVER_EVENT) {
-	//			reportError("server event", 24); // just for debugging
 				sys_event &= ~SERVER_EVENT;
 				serverEvent();
+
+				/* if (++cnt >= 50) {
+					// just for debugging
+					reportError("50 server events", 50, io_usb_out);
+					while (cnt++);
+					cnt = 0;
+				} */
 			}
 			else {
 				// ERROR. Unrecognized event. Report it.
-				reportError("UnrecognizedEventErr", SYS_ERR_EVENT);
+				reportError("UnrecognizedEvent", SYS_ERR_EVENT, io_usb_out);
 
 				// Clear all pending events -
 				// attempt to let the system correct itself.
@@ -206,22 +215,18 @@ static int msp430init() {
     // (a function returns non-zero), then print the error to the console:
 
 	if (err = WDT_init()) { // init the watchdog timer
-//		reportError("WDTinit err", err);
 		return err;
 	}
 
     if (err = setClock()) { // init the clock (also on port J)
-//    	reportError("setClk err", err);
     	return err;
     }
 
     if (err = ft201x_init()) { // init the USB comm chip (ft201x)
-//    	reportError("ft201x err", err);
     	return err;
     }
 
     if (err = i2c_init()) { // init i2c
-//    	reportError("i2c err", err);
     	return err;
     }
 
@@ -237,7 +242,7 @@ static int threadsInit() {
 
 	// Initialize pthreads. Use defaults (NULL argument).
 	if (error = pthread_init(NULL)) {
-		reportError("Error initializing pthreads", error);
+		reportError("Err-pthread_init", error, io_usb_out);
 		return error;
 	}
 
@@ -245,36 +250,41 @@ static int threadsInit() {
 	pthreadHandle_server = pthread_self();
 	if (error = pthread_create(&pthreadHandle_streamer, NULL,
 			streamerThread, NULL)) {
-		reportError("Error creating streamer thread", error);
+		reportError("Err-pthread_create(streamer)", error, io_usb_out);
 		return error;
 	}
 
-	// Initialize vine mutex
-	pthread_mutex_init(&vineMutex, NULL); // vineMutex, unblocked
+	// Initialize mutexes
+	pthread_mutex_init(&vineMutex, NULL); // vine mutex, unblocked
+	pthread_mutex_init(&hostMutex, NULL); // host mutex, unblocked
 	return 0;
 }
 
 // Reports an error to the user
-void reportError(char* msg, int err) {
+// todo: this is a problem. it could be that because of
+// this the master is missing a request from the host...
+// but I don't think so. look into this.
+// This function isn't working properly...
+void reportError(char* msg, int err, IObuffer* buff) {
 	int byteCount;
 	// Fill up the buffer - it's easier for us to fill up the buffer all the
 	// way than to try to count the size of each error message.
 	// Because the length byte isn't part of the message, put size-1 as length.
-	IOputc((char)(io_usb_out->size-1), io_usb_out);
+	IOputc((char)(buff->size-1), buff);
 	// put the type of message (error) in the buffer
-	IOputc((char)(TYPE_ERROR), io_usb_out);
+	IOputc((char)(TYPE_ERROR), buff);
 	// put the error code in
-	IOputc((char)err, io_usb_out);
+	IOputc((char)err, buff);
 	// put the message in - count how many bytes that is
-	byteCount = IOputs(msg, io_usb_out);
-	// is there space left?
+	byteCount = IOputs(msg, buff);
+	// is there space left in the buffer
 	if (byteCount > 0) {
-		// yes, fill it up with nulls
-		while(IOputc(0, io_usb_out) == SUCCESS);
+		// yes, fill up the remaining space with nulls
+		while(IOputc(0, buff) == SUCCESS);
 	}
 	// no, buffer is full - didn't finish putting message into buffer.
 	// just send the message as is.
-	while (USBOutEvent()); // keep calling until it returns done.
+	while (USBOutEvent(buff)); // keep calling until it returns done.
 }
 
 // Just spins in an infinite loop
@@ -291,6 +301,7 @@ void handleError() {
 	__disable_interrupt(); // Disable interrupts
 	WDTCTL = WDTPW | WDTHOLD; // Turn off watchdog
 	ft201x_close();
+	// todo: pthread_mutex_destroy() on each mutex
 	// todo: pthread_join(pthreadHandle_streamer);
 
 	// Loop forever - short delay between toggling LEDs

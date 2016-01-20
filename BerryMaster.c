@@ -12,6 +12,7 @@
  variables ********************************************************************
  *****************************************************************************/
 DeviceList_t myDeviceList;
+extern IObuffer* io_usb_out;
 
 /******************************************************************************
  function prototypes and macros ***********************************************
@@ -95,7 +96,7 @@ int initDevices() {
 /* getDeviceType
  * @param the address of the device
  * @param a pointer to store the type of the device at the specified address;
- * 	       notADevice (0) if device is not on network
+ * 	       unknown (0) if device is not on network
  * @return SUCCESS for success; 1 if the device is not on the network.
  */
 int getDeviceType(uint8_t addr, uint8_t* deviceType) {
@@ -113,7 +114,7 @@ int getDeviceType(uint8_t addr, uint8_t* deviceType) {
 }
 
 /* getDeviceValue
- * gets the value (or current state) of the device at the specified address
+ * gets a value in the specified register of the device at the specified address
  * @param the address of the device
  * @param a pointer to store the value
  * @param the register to read
@@ -273,7 +274,7 @@ static int getNewDevices() {
 			if (error = getDeviceTypeFromHal(addr, &type)) {
 				// error - failed to get the type from the device
 				myDeviceList.devices[addr].deviceType = UNKNOWN;
-				reportError("Unknown device type in getNewDevices", error);
+				reportError("unknown dev type", error, io_usb_out);
 				return error;
 			}
 			// Successfully got the type

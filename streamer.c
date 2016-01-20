@@ -12,6 +12,9 @@
 // The list of devices on the network
 extern DeviceList_t myDeviceList;
 
+// The vine mutex
+extern pthread_mutex_t vineMutex;
+
 /*
  * streamerThread
  * This is a thread to be created using the pthreads library.
@@ -28,7 +31,8 @@ void* streamerThread() {
 	volatile int cnt = 0;
 	while(1) {
 		notifyHost = FALSE;
-		if (++cnt == 10) {
+		// toggle LED every 50th iteration (I just made that number up)
+		if (++cnt == 50) {
 			cnt = 0;
 			LED1_TOGGLE;
 		}
@@ -47,6 +51,10 @@ void* streamerThread() {
 				case 1:
 					break;
 				case TYPE_LED:
+					pthread_mutex_lock(&vineMutex);
+					getDeviceValue(dev->deviceAddress, &dev->vals[0], REG_LED0);
+					pthread_mutex_unlock(&vineMutex);
+					//reportError(dev->vals[0], "led value");
 					break;
 				case 3:
 					break;
