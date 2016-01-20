@@ -11,7 +11,7 @@
 /******************************************************************************
  variables ********************************************************************
  *****************************************************************************/
-static DeviceList_t myDeviceList;
+DeviceList_t myDeviceList;
 
 /******************************************************************************
  function prototypes and macros ***********************************************
@@ -103,7 +103,7 @@ int getDeviceType(uint8_t addr, uint8_t* deviceType) {
 	if (!addrIsUsed(addr)) {
 		// No - return failed.
 		*deviceType = (int)UNKNOWN;
-		return 1;
+		return DEVICE_NOT_FOUND;
 	}
 	else {
 		// Yes, there is a device - set the type and return success.

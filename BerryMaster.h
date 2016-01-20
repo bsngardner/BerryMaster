@@ -197,9 +197,9 @@ int getDeviceType(uint8_t addr, uint8_t* deviceType);
 
 /* getDeviceValue
  * gets the value (or current state) of the device at the specified address
- * @param the address of the device
- * @param a pointer to store the value
- * @param the register to read
+ * @param addr - the address of the device
+ * @param value - a pointer to store the value
+ * @param reg - the register to read
  * @return 0 if successful; 1 otherwise
  */
 int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg);

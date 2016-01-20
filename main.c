@@ -25,10 +25,10 @@
  */
 
 // TODO's:
-// Add back in ERROR2 for initialization code.
-// Do better error handling in handleError
+// Develop streamer thread
+// Malloc memory for berries rather than preallocating memory
+// Add Prof Roper's ERROR2() for handling errors in initialization code
 // Fix up ft201x code
-// Add in threading
 // Add in SPI init code for radio
 // Fix ft201x hardware interrupt - it is always pulling the line low, even
 //   after we empty the hardware buffers (which should let the line float high)
@@ -45,12 +45,13 @@
 #include "i2c.h"
 #include "server.h"
 #include "pthreads.h"
+#include "streamer.h"
 
 // Macros
 #define WDT_CLKS_PER_SEC	512				// 512 Hz WD clock (@32 kHz)
 #define WDT_CTL				WDT_ADLY_1_9	// 1.95 ms
 #define DEBOUNCE_CNT		80
-#define USB_POLL_CNT		4 // 16 // 32
+#define USB_POLL_CNT		4
 #define MAX_EVENT_ERRORS	10
 
 // Local function prototypes
@@ -58,7 +59,6 @@ static int WDT_init();
 static int setClock();
 static int msp430init();
 static int threadsInit();
-static void* streamerThread();
 
 // Global Variables
 static volatile int WDT_cps_cnt;
@@ -69,13 +69,6 @@ pthread_t pthreadHandle_server;
 pthread_t pthreadHandle_streamer;
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
-
-static void* streamerThread() {
-	volatile int i = 0;
-	while(1) {
-		i++;
-	}
-}
 
 /*
  * main.c
@@ -100,50 +93,51 @@ int main(void) {
 	// Wait for an interrupt
     while(1) {
 		// disable interrupts before check sys_event
-		__disable_interrupt();
+		//__disable_interrupt();
 
-		if (sys_event) {
-			// if there's something pending, enable interrupts before servicing
-			__enable_interrupt();
-		}
-		else {
-			// otherwise, enable interrupts and goto sleep (LPM0)
-			__bis_SR_register(LPM0_bits | GIE);
+    	if (!sys_event) {
+			// no events pending, enable interrupts and goto sleep (LPM0)
+			//__bis_SR_register(LPM0_bits | GIE);
 			continue;
 		}
 
-		// Service any pending events.
-		if (sys_event & USB_I_EVENT) {
-			sys_event &= ~USB_I_EVENT;
-			USBInEvent();
-		}
-		else if (sys_event & USB_O_EVENT) {
-			sys_event &= ~USB_O_EVENT;
-			if (USBOutEvent()) {
-				// We're not finished, queue up this event again.
-				sys_event |= USB_O_EVENT;
-			}
-		}
-		else if (sys_event & SERVER_EVENT) {
-//			reportError("server event", 24); // just for debugging
-			sys_event &= ~SERVER_EVENT;
-			serverEvent();
-		}
-		else {
-			// ERROR. Unrecognized event. Report it.
-			reportError("UnrecognizedEventErr", SYS_ERR_EVENT);
+    	else {
+			// at least 1 event is pending, enable interrupts before servicing
+			//__enable_interrupt();
 
-			// Clear all pending events -
-			// attempt to let the system correct itself.
-			sys_event = 0;
-
-			// If the number of event errors reaches a predefined value,
-			// stop the program
-			numEventErrors++;
-			if (numEventErrors >= MAX_EVENT_ERRORS) {
-				handleError();
+			// Service any pending events.
+			if (sys_event & USB_I_EVENT) {
+				sys_event &= ~USB_I_EVENT;
+				USBInEvent();
 			}
-		}
+			else if (sys_event & USB_O_EVENT) {
+				sys_event &= ~USB_O_EVENT;
+				if (USBOutEvent()) {
+					// We're not finished, queue up this event again.
+					sys_event |= USB_O_EVENT;
+				}
+			}
+			else if (sys_event & SERVER_EVENT) {
+	//			reportError("server event", 24); // just for debugging
+				sys_event &= ~SERVER_EVENT;
+				serverEvent();
+			}
+			else {
+				// ERROR. Unrecognized event. Report it.
+				reportError("UnrecognizedEventErr", SYS_ERR_EVENT);
+
+				// Clear all pending events -
+				// attempt to let the system correct itself.
+				sys_event = 0;
+
+				// If the number of event errors reaches a predefined value,
+				// stop the program
+				numEventErrors++;
+				if (numEventErrors >= MAX_EVENT_ERRORS) {
+					handleError();
+				}
+			}
+    	}
     }
 }
 
