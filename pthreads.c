@@ -187,6 +187,7 @@ int pthread_mutex_init(pthread_mutex_t *mutex,		// pointer to mutex struct
 	memset((char*)mutex, 0, sizeof(pthread_mutex_t));
 	mutex->tid = (uint8_t)-1;					// invalidate tid
 	mutex->state = attr ? attr->state : unblocked;
+	// TODO: why not set mutex->size to zero?
 	return 0;
 } // end pthread_mutex_init
 

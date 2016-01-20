@@ -61,14 +61,15 @@ static int msp430init();
 static int threadsInit();
 
 // Global Variables
-static volatile int WDT_cps_cnt;
-static volatile int usb_poll_cnt;
-static volatile int debounceCnt;
-volatile uint16_t sys_event;
-pthread_t pthreadHandle_server;
-pthread_t pthreadHandle_streamer;
+static volatile int WDT_cps_cnt; // one second counter
+static volatile int usb_poll_cnt; // when 0, the usb is polled for data
+static volatile int debounceCnt; // debounce counter
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
+volatile uint16_t sys_event; // holds all events
+pthread_t pthreadHandle_server; // handle to server thread
+pthread_t pthreadHandle_streamer; // handle to streamer thread
+pthread_mutex_t vineMutex;
 
 /*
  * main.c
@@ -93,17 +94,17 @@ int main(void) {
 	// Wait for an interrupt
     while(1) {
 		// disable interrupts before check sys_event
-		//__disable_interrupt();
+		__disable_interrupt();
 
     	if (!sys_event) {
 			// no events pending, enable interrupts and goto sleep (LPM0)
-			//__bis_SR_register(LPM0_bits | GIE);
+			__bis_SR_register(LPM0_bits | GIE);
 			continue;
 		}
 
     	else {
 			// at least 1 event is pending, enable interrupts before servicing
-			//__enable_interrupt();
+			__enable_interrupt();
 
 			// Service any pending events.
 			if (sys_event & USB_I_EVENT) {
@@ -247,6 +248,9 @@ static int threadsInit() {
 		reportError("Error creating streamer thread", error);
 		return error;
 	}
+
+	// Initialize vine mutex
+	pthread_mutex_init(&vineMutex, NULL); // vineMutex, unblocked
 	return 0;
 }
 

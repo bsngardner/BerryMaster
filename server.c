@@ -10,6 +10,7 @@
 #include "IObuffer.h"
 #include "ft201x.h"
 #include <msp430.h>
+#include "pthreads.h"
 
 // ----------------------------------------------------------------------------
 // Global variables -----------------------------------------------------------
@@ -21,6 +22,11 @@ uint8_t sentMessage[MAX_MSG_LENGTH];
 // A signal for the sentMessage buffer - if FALSE, the buffer is open for
 // writing; if TRUE, the buffer is locked and we have received a full message.
 volatile int buffLocked = FALSE;
+
+// The mutex for writing to or reading from the vine.
+// TODO: eventually move this down to HAL code - the closer to the hardware,
+// the better.
+extern pthread_mutex_t vineMutex;
 
 // ----------------------------------------------------------------------------
 // Function prototypes --------------------------------------------------------
@@ -103,7 +109,9 @@ int serverEvent() {
 // calls master initDevices function
 // and sends a reply back to the host
 void rpc_initDevices(uint8_t* message, uint8_t len) {
+	pthread_mutex_lock(&vineMutex);
 	uint8_t result = initDevices();
+	pthread_mutex_unlock(&vineMutex);
 	uint8_t length = STD_REPLY_LENGTH;
 	message[OFFSET_LENGTH] = length;
 	message[OFFSET_TYPE] = TYPE_REPLY;
@@ -121,7 +129,9 @@ void rpc_getDeviceType(uint8_t* message, uint8_t len) {
 
 	// call master getDeviceType
 	uint8_t type;
+	pthread_mutex_lock(&vineMutex);
 	uint8_t result = getDeviceType(addr, &type);
+	pthread_mutex_unlock(&vineMutex);
 
 	// reply back to host.
 	uint8_t length = STD_REPLY_LENGTH + 1;
@@ -134,7 +144,7 @@ void rpc_getDeviceType(uint8_t* message, uint8_t len) {
 
 void rpc_getDeviceValue(uint8_t* message, uint8_t len) {
 
-	reportError("test in getDeviceValue function", 32);
+	// reportError("test in getDeviceValue function", 32);
 	// get the address from the message
 	uint8_t addr = message[OFFSET_ADDR];
 
@@ -143,7 +153,9 @@ void rpc_getDeviceValue(uint8_t* message, uint8_t len) {
 
 	// get the value from the device
 	uint8_t value;
+	pthread_mutex_lock(&vineMutex);
 	uint8_t result = getDeviceValue(addr, &value, reg);
+	pthread_mutex_unlock(&vineMutex);
 
 	// reply back to the host.
 	uint8_t length = STD_REPLY_LENGTH + 1;
@@ -165,7 +177,9 @@ void rpc_setDeviceValue(uint8_t* message, uint8_t len) {
 	uint8_t value = message[OFFSET_ADDR + 2];
 
 	// set the value in the device
+	pthread_mutex_lock(&vineMutex);
 	uint8_t result = setDeviceValue(addr, value, reg);
+	pthread_mutex_unlock(&vineMutex);
 
 	// reply back to the host
 	uint8_t length = STD_REPLY_LENGTH;
