@@ -365,6 +365,9 @@ void USBInEvent() {
 // Output the out buffer to the usb
 int USBOutEvent() {
 #define BUF_SIZE 32 // was 16
+
+	LED1_ON; // toggle heartbeat LED
+
 	int i; // byte count
 	char buf[BUF_SIZE]; // out buffer (double buffering is inefficient here...)
 
@@ -383,6 +386,8 @@ int USBOutEvent() {
 		ft201x_i2c_write(buf, i);
 //		LED1_OFF;
 	}
+
+	LED1_OFF;
 
 	// If we haven't read everything out of the buffer yet,
 	// come back to this event.

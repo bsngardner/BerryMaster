@@ -34,7 +34,7 @@
 #define OFFSET_REPLY_PARAMS 3
 
 // maximum length of a message
-#define MAX_MSG_LENGTH   64
+#define MAX_MSG_LENGTH   220
 
 // length of reply without parameters
 #define STD_REPLY_LENGTH 2 // type + result = 2 bytes

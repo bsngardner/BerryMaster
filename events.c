@@ -20,7 +20,7 @@ volatile uint16_t sys_event;
 volatile int WDT_cps_cnt;
 volatile int usb_poll_cnt;
 volatile int debounceCnt;
-volatile int hal_cnt = TEST_COUNT;
+volatile int test_cnt = 0;
 
 void event_loop() {
 	int numEventErrors = 0;
@@ -88,7 +88,7 @@ uint8_t new = 0;
 uint8_t reset = 0;
 
 void test_event() {
-	iofprintf(io_usb_out, "Listen!\n\r");
+	//iofprintf(io_usb_out, "Listen!\n\r");
 	if (!reset) {
 		hal_resetAllDevices();
 		reset = 1;
@@ -131,10 +131,13 @@ void test_event() {
 					devices[i].val ^= 0x01;
 					hal_setDeviceRegister(devices[i].addr, devices[i].reg,
 							devices[i].val);
-					hal_getDeviceMultipleRegisters(devices[i].addr, 6, buffer,
-							1);
-					iofprintf(io_usb_out, "From device %d: %s\n\r",
-							devices[i].addr, buffer);
+					hal_getDeviceMultiRegs(devices[i].addr, 6, buffer, 16);
+					buffer[16] = 0;
+					iofprintf(io_usb_out, "From device %d: ", devices[i].addr);
+					for (i = 0; i < 16; i++) {
+						iofprintf(io_usb_out, "%d ", buffer[i]);
+					}
+					iofprintf(io_usb_out, "\n\r");
 					break;
 				case SW_T:
 					hal_getDeviceRegister(devices[i].addr, devices[i].reg,
@@ -150,7 +153,7 @@ void test_event() {
 			}
 		}
 	}
-	LED1_OFF;
+	LED0_OFF;
 }
 
 //-----------------------------------------------------------------------------
@@ -159,11 +162,13 @@ void test_event() {
 #pragma vector = WDT_VECTOR
 __interrupt void WDT_ISR(void) {
 
-	if (!(--hal_cnt)) {
-		hal_cnt = TEST_COUNT;
-		sys_event |= TEST_EVENT;
-		__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
-		LED1_ON;
+	if (test_cnt) {
+		if (!(--test_cnt)) {
+			test_cnt = TEST_COUNT;
+			sys_event |= TEST_EVENT;
+			__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
+			LED0_ON;
+		}
 	}
 
 	--WDT_cps_cnt;
@@ -172,7 +177,6 @@ __interrupt void WDT_ISR(void) {
 	// One second elapsed
 	if (WDT_cps_cnt == 0) {
 		WDT_cps_cnt = WDT_CLKS_PER_SEC;
-		LED0_TOGGLE; // toggle heartbeat LED
 	}
 //
 //	// Should we poll the USB?
@@ -187,6 +191,7 @@ __interrupt void WDT_ISR(void) {
 		// Yes; are we finished?
 		--debounceCnt;
 		if (debounceCnt == 0) {
+			test_cnt = TEST_COUNT;
 			// TODO: Signal button event.
 		}
 	}

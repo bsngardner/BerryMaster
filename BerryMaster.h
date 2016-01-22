@@ -84,7 +84,7 @@ enum SYS_ERRORS {
 };
 
 // Maximum size of a message to or from the Master
-#define MAX_MSG_LENGTH 64
+#define MAX_MSG_LENGTH 220
 
 // Other macros
 #define ASCII_ZERO 48
