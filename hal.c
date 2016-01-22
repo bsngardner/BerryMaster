@@ -43,6 +43,7 @@ uint8_t hal_init() {
 	P1SEL1 |= (SDA_PIN | SCL_PIN);
 
 	UCB0CTLW0 |= UCSWRST;                          // put eUSCI_B in reset state
+	UCB0CTLW0 &= ~UCSSEL_2;
 	UCB0CTLW0 |= (UCMODE_3 | UCMST | UCTR | UCSSEL_2); // I2C master mode, SMCLK
 	UCB0BRW = CLOCK_SPEED / I2C_SPEED;        // baudrate = SMCLK /400,000
 	UCB0CTLW0 &= ~UCSWRST;                            // clear reset register
@@ -109,7 +110,6 @@ uint8_t hal_resetAllDevices() {
 	if (status == NACK) {
 		return ADDR_REJECTED;
 	}
-	return NO_RESPONSE; // uh-oh
 }
 
 // Sends 0x01 to device address, returns 0 if device ACKed, 1 if NACK
