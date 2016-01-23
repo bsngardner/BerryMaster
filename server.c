@@ -26,7 +26,7 @@ volatile int buffLocked = FALSE;
 // The mutex for writing to or reading from the vine.
 // TODO: eventually move this down to HAL code - the closer to the hardware,
 // the better.
-extern pthread_mutex_t vineMutex;
+extern //pthread_mutex_t vineMutex;
 
 // ----------------------------------------------------------------------------
 // Function prototypes --------------------------------------------------------
@@ -42,6 +42,8 @@ void rpc_initDevices(uint8_t* message, uint8_t len);
 void rpc_getDeviceType(uint8_t* message, uint8_t len);
 
 void rpc_getDeviceValue(uint8_t* message, uint8_t len);
+
+void rpc_getDeviceMultiValues(uint8_t* message, uint8_t len);
 
 void rpc_setDeviceValue(uint8_t* message, uint8_t len);
 
@@ -71,7 +73,7 @@ int serverEvent() {
 	// get the message:
 	if (recv_request() == MSG_NOT_SENT_YET) {
 		// Error! Shouldn't service this event until the message has been rxed
-		reportError("recv_request err", RECV_REQ_ERROR, io_usb_out);
+		//reportError("recv_request err", RECV_REQ_ERROR, io_usb_out);
 		handleError(); // todo: do this better
 	}
 
@@ -93,6 +95,9 @@ int serverEvent() {
 		// Get the specified register value in the berry.
 		rpc_getDeviceValue(sentMessage, len);
 		break;
+	case OPCODE_GET_DEVICE_MULTI_VALUES:
+		// Get specified register values in the berry.
+		rpc_getDeviceMultiValues(sentMessage, len);
 	case OPCODE_SET_DEVICE_VALUE:
 		// Set the specified register value in the berry.
 		rpc_setDeviceValue(sentMessage, len);
@@ -108,12 +113,12 @@ int serverEvent() {
 // and sends a reply back to the host
 void rpc_initDevices(uint8_t* message, uint8_t len) {
 	// Call init devices
-	pthread_mutex_lock(&vineMutex);
+	//pthread_mutex_lock(&vineMutex);
 	uint8_t result = initDevices();
-	pthread_mutex_unlock(&vineMutex);
+	//pthread_mutex_unlock(&vineMutex);
 
 	// Send reply
-	uint8_t length = STD_REPLY_LENGTH;
+	const uint8_t length = STD_REPLY_LENGTH;
 	message[OFFSET_LENGTH] = length;
 	message[OFFSET_TYPE] = TYPE_REPLY;
 	message[OFFSET_RESULT] = result;
@@ -130,12 +135,12 @@ void rpc_getDeviceType(uint8_t* message, uint8_t len) {
 
 	// call master getDeviceType
 	uint8_t type;
-	pthread_mutex_lock(&vineMutex);
+	//pthread_mutex_lock(&vineMutex);
 	uint8_t result = getDeviceType(addr, &type);
-	pthread_mutex_unlock(&vineMutex);
+	//pthread_mutex_unlock(&vineMutex);
 
 	// reply back to host.
-	uint8_t length = STD_REPLY_LENGTH + 1;
+	const uint8_t length = STD_REPLY_LENGTH + 1;
 	message[OFFSET_LENGTH] = length;
 	message[OFFSET_TYPE] = TYPE_REPLY;
 	message[OFFSET_RESULT] = result;
@@ -154,16 +159,44 @@ void rpc_getDeviceValue(uint8_t* message, uint8_t len) {
 
 	// get the value from the device
 	uint8_t value;
-	pthread_mutex_lock(&vineMutex);
+	//pthread_mutex_lock(&vineMutex);
 	uint8_t result = getDeviceValue(addr, &value, reg);
-	pthread_mutex_unlock(&vineMutex);
+	//pthread_mutex_unlock(&vineMutex);
 
 	// reply back to the host.
-	uint8_t length = STD_REPLY_LENGTH + 1;
+	const uint8_t length = STD_REPLY_LENGTH + 1;
 	message[OFFSET_LENGTH] = length; // length of reply in bytes
 	message[OFFSET_TYPE] = TYPE_REPLY;
 	message[OFFSET_RESULT] = result; // success (0) or failed (non-zero)
 	message[OFFSET_REPLY_PARAMS] = value; // the value in the register
+	send_reply(message, length);
+}
+
+void rpc_getDeviceMultiValues(uint8_t* message, uint8_t len) {
+	// address of the berry
+	uint8_t addr = message[OFFSET_ADDR];
+
+	// register to start the read
+	uint8_t reg = message[OFFSET_ADDR + 1];
+
+	// number of bytes to read
+	uint8_t count = message[OFFSET_ADDR + 2];
+
+	// read from the berry
+	uint8_t buff[4];
+	//pthread_mutex_lock(&vineMutex);
+	uint8_t result = getDeviceMultiValues(addr, 6, buff, 4);
+	//pthread_mutex_unlock(&vineMutex);
+
+	// reply back to the host
+	const uint8_t length = STD_REPLY_LENGTH + 4;
+	message[OFFSET_LENGTH] = length;
+	message[OFFSET_TYPE] = TYPE_REPLY;
+	message[OFFSET_RESULT] = result;
+	unsigned i;
+	for (i = 0; i < 4; i++) {
+		message[OFFSET_REPLY_PARAMS + i] = buff[i];
+	}
 	send_reply(message, length);
 }
 
@@ -178,12 +211,12 @@ void rpc_setDeviceValue(uint8_t* message, uint8_t len) {
 	uint8_t value = message[OFFSET_ADDR + 2];
 
 	// set the value in the device
-	pthread_mutex_lock(&vineMutex);
+	//pthread_mutex_lock(&vineMutex);
 	uint8_t result = setDeviceValue(addr, value, reg);
-	pthread_mutex_unlock(&vineMutex);
+	//pthread_mutex_unlock(&vineMutex);
 
 	// reply back to the host
-	uint8_t length = STD_REPLY_LENGTH;
+	const uint8_t length = STD_REPLY_LENGTH;
 	message[OFFSET_LENGTH] = length; // length of reply in bytes
 	message[OFFSET_TYPE] = TYPE_REPLY;
 	message[OFFSET_RESULT] = result; // success (0) or failed (non-zero)

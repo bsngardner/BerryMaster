@@ -205,6 +205,16 @@ int getDeviceType(uint8_t addr, uint8_t* deviceType);
  */
 int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg);
 
+/* getDeviceMultiValues
+ * gets multiple bytes from the requested berry
+ * @param addr - address of the device
+ * @param reg - the register number where we begin to read
+ * @param buff - pointer of a buffer to store the values
+ * @param count - number of bytes to read
+ */
+int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
+		uint8_t count);
+
 /* setDeviceValue
  * sets the device's value to the specified value
  * @param the address of the device
@@ -234,7 +244,7 @@ void clearNetwork();
  * @param err - the error number to print
  * @param buff - the buffer in which to put the message
  */
-void reportError(char* msg, int err, IObuffer* buff);
+void reportError(char* msg, int err);//, IObuffer* buff);
 
 /*
  * spins in an infinite loop, toggling LEDs 0 and 1

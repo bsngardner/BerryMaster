@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include "hal.h"
 #include "msp430.h"
+#include "BerryMaster.h"
 
 //enum used to track state and communicate between sending functions and isr
 typedef enum {
@@ -24,6 +25,7 @@ static volatile uint8_t rxData[16];
 static volatile uint8_t * rxPtr;
 
 static volatile uint8_t vineSleep = 0;
+static volatile uint16_t repeat_start = 0;
 volatile static I2C_STATUS status = STOP;
 
 //Defines
@@ -36,11 +38,13 @@ volatile static I2C_STATUS status = STOP;
 //Addresses
 #define GEN_CALL 0x00
 
+#define FORCE_GPIO P1SEL1 &= ~(SDA_PIN | SCL_PIN)
+#define SET_I2C	P1SEL1 |= (SDA_PIN | SCL_PIN)
 //Initialize the data bus
 // sets up SDA and SCL, inits eUSCI module, enables interrupt vector
 uint8_t hal_init() {
 
-	P1SEL1 |= (SDA_PIN | SCL_PIN);
+	SET_I2C;
 
 	UCB0CTLW0 |= UCSWRST;                          // put eUSCI_B in reset state
 	UCB0CTLW0 &= ~UCSSEL_2;
@@ -80,11 +84,13 @@ uint8_t hal_discoverNewDevice(uint8_t new_address) {
 	while (vineSleep)
 		LPM0;
 
-	if (status == STOP) {
-		return ADDR_ACCEPTED;
-	}
 	if (status == NACK) {
-		return ADDR_REJECTED;
+		reportError("nack", 1);
+		return NO_RESPONSE;
+	}
+	if (status == STOP) {
+		reportError("stop", 0);
+		return SUCCESS;
 	}
 	return 1;
 } //End hal_discoverNewDevice()
@@ -104,12 +110,15 @@ uint8_t hal_resetAllDevices() {
 	while (vineSleep)
 		LPM0;
 
-	if (status == STOP) {
-		return ADDR_ACCEPTED;
-	}
 	if (status == NACK) {
-		return ADDR_REJECTED;
+		reportError("nack", 1);
+		return NO_RESPONSE;
 	}
+	if (status == STOP) {
+		reportError("stop", 0);
+		return SUCCESS;
+	}
+	return 0;
 }
 
 // Sends 0x01 to device address, returns 0 if device ACKed, 1 if NACK
@@ -127,11 +136,13 @@ uint8_t hal_pingDevice(uint8_t address) {
 	while (vineSleep)
 		LPM0;
 
-	if (status == STOP) {
-		return PING;
-	}
 	if (status == NACK) {
+		reportError("nack", 1);
 		return NO_RESPONSE;
+	}
+	if (status == STOP) {
+		reportError("stop", 0);
+		return SUCCESS;
 	}
 	__no_operation();
 	//oh no
@@ -158,34 +169,60 @@ uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg, uint8_t value) {
 	while (vineSleep)
 		LPM0;
 
-	if (status == STOP) {
-		return PING;
-	}
 	if (status == NACK) {
+		reportError("nack", 1);
 		return NO_RESPONSE;
+	}
+	if (status == STOP) {
+		reportError("stop", 0);
+		return SUCCESS;
 	}
 	return 1;
 }
+
+#define DMA_CTL (DMADSTINCR0 | DMADSTINCR1 | DMADSTBYTE | DMASRCBYTE)
+#define DMA_DIS DMA0CTL = 0
+
+inline void dma_config(uint8_t * dest_addr, uint8_t count) {
+	DMACTL0 = DMA0TSEL__UCB0RXIFG0;
+	DMA0CTL = DMA_CTL;
+
+	__data16_write_addr((unsigned int) &DMA0SA, (unsigned long) &UCB0RXBUF);
+	__data16_write_addr((unsigned int) &DMA0DA, (unsigned long) dest_addr);
+	DMA0SZ = count;
+	DMA0CTL |= DMAEN;
+}
+
 //Stores data from device (@address) register (reg) in variable (ret_val)
-uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret_val) {
+uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret) {
+
+	return hal_getDeviceMultiRegs(address, reg, ret, 1);
+}
+
+//Stores data from device (@address) register (reg) in variable (ret_val)
+uint8_t hal_getDeviceMultiRegs(uint8_t address, uint8_t reg,
+		uint8_t* ret, uint8_t count) {
 
 	UCB0I2CSA = address;
 	txPtr = txData;
 	*txPtr = reg;
-	rxPtr = rxData;
+	rxPtr = ret;
 
 	UCB0CTLW0 |= UCSWRST;
 
 	UCB0CTLW0 |= UCTR;
 	UCB0CTLW1 &= ~UCASTP_3;
-	UCB0CTLW1 |= UCASTP_1;
+	UCB0CTLW1 |= UCASTP_2;
 	UCB0TBCNT = 1;
 
 	UCB0CTLW0 &= ~UCSWRST;
-	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE | UCBCNTIE;
+	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
 
-	byte_count = 0;
-	load_byte_count = 1;
+	repeat_start = 1;
+	byte_count = count;
+
+	//dma_config(rxPtr, count);
+
 	vineSleep = 1;
 	status = DATA;
 	UCB0CTLW0 |= UCTXSTT;
@@ -194,10 +231,11 @@ uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret_val) {
 		LPM0;
 
 	if (status == NACK) {
+		reportError("nack", 1);
 		return NO_RESPONSE;
 	}
 	if (status == STOP) {
-		*ret_val = rxData[0];
+		reportError("stop", 0);
 		return SUCCESS;
 	}
 	return 3;
@@ -226,36 +264,35 @@ __interrupt void euscib0_isr(void) {
 
 	switch (UCB0IV) {
 	case NACK_IV:
-		UCB0IFG &= ~UCNACKIFG;
+		UCB0IFG &= ~(UCNACKIFG);
 		UCB0CTLW0 |= UCTXSTP;                  // I2C stop condition.
+		repeat_start = 0;
 		status = NACK;
 		break;
 	case STP_IV:
 		UCB0IFG &= ~UCSTPIFG;
-		if (status != NACK)
-			status = STOP;
-		vineSleep = 0;
-		__bic_SR_register_on_exit(LPM0_bits);
+		if (repeat_start) {
+			UCB0CTLW0 |= UCSWRST;
+			UCB0CTLW0 &= ~UCTR;
+			UCB0TBCNT = byte_count;
+			UCB0CTLW0 &= ~UCSWRST;
+			UCB0IE = UCNACKIE | UCSTPIE;
+			UCB0IE |= UCRXIE0;
+			UCB0CTLW0 |= UCTXSTT;
+
+			repeat_start = 0;
+		} else {
+			if (status != NACK)
+				status = STOP;
+			vineSleep = 0;
+			__bic_SR_register_on_exit(LPM0_bits);
+		}
 		break;
 	case TX0_IV:
 		UCB0TXBUF = *txPtr++;
 		break;
 	case RX0_IV:
 		*rxPtr++ = UCB0RXBUF;
-		break;
-	case BCNT_IV:
-		UCB0IFG &= ~UCBCNTIFG;
-		if (byte_count) {
-			if (!(--byte_count)) {
-				UCB0CTLW0 |= UCTXSTP;
-			}
-		} else {
-			byte_count = load_byte_count;
-			UCB0CTLW0 &= ~UCTR;
-			UCB0IE &= ~UCTXIE0;
-			UCB0IE |= UCRXIE0;
-			UCB0CTLW0 |= UCTXSTT;
-		}
 		break;
 	default:
 		break;

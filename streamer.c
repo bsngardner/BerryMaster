@@ -51,9 +51,9 @@ void* streamerThread() {
 				case 1:
 					break;
 				case TYPE_LED:
-					pthread_mutex_lock(&vineMutex);
-					getDeviceValue(dev->deviceAddress, &dev->vals[0], REG_LED0);
-					pthread_mutex_unlock(&vineMutex);
+					//pthread_mutex_lock(&vineMutex);
+					//getDeviceValue(dev->deviceAddress, &dev->vals[0], REG_LED0);
+					//pthread_mutex_unlock(&vineMutex);
 					//reportError(dev->vals[0], "led value");
 					break;
 				case 3:

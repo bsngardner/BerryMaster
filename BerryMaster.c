@@ -147,6 +147,41 @@ int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg) {
 	}
 }
 
+/* getDeviceMultiValues
+ * gets multiple bytes from the requested berry
+ * @param address - address of the device
+ * @param reg - the register number where we begin to read
+ * @param ret_val - pointer to store the value
+ * @param count - number of bytes to read
+ */
+int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
+		uint8_t count) {
+	int error;
+	// invalid address for a device
+	if (addr == 0 || addr > MAX_NUM_DEVICES) {
+		buff[0] = 0xff;
+		return INVALID_ADDR;
+	}
+	// valid address, but there is no device on the network at this address
+	else if (!addrIsUsed(addr)) {
+		buff[0] = 0xff;
+		return DEVICE_NOT_FOUND;
+	}
+	// valid device
+	else {
+		// call hal to get the value.
+		if (error = hal_getDeviceMultiRegs(addr, reg, buff, count)) {
+			// operation failed
+			buff[0] = 0xff;
+			return error;
+		}
+		else {
+			// operation successful
+			return SUCCESS;
+		}
+	}
+}
+
 /* setDeviceValue
  * sets the device's value to the specified value
  * @param the address of the device
@@ -274,7 +309,7 @@ static int getNewDevices() {
 			if (error = getDeviceTypeFromHal(addr, &type)) {
 				// error - failed to get the type from the device
 				myDeviceList.devices[addr].deviceType = UNKNOWN;
-				reportError("unknown dev type", error, io_usb_out);
+				//reportError("unknown dev type", error, io_usb_out);
 				return error;
 			}
 			// Successfully got the type

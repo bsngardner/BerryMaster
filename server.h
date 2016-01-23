@@ -48,6 +48,7 @@
 #define OPCODE_INIT_DEVICES	 	'i'
 #define OPCODE_GET_DEVICE_TYPE  't'
 #define OPCODE_GET_DEVICE_VALUE 'g'
+#define OPCODE_GET_DEVICE_MULTI_VALUES 'h'
 #define OPCODE_SET_DEVICE_VALUE 's'
 
 // recv_request return types

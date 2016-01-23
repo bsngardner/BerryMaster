@@ -309,7 +309,7 @@ void USBInEvent() {
 		// Read the next char
 		if (err = IOgetc(&data, io_usb_in)) {
 			// Error getting character
-			reportError("IOgetc USBInEvent err", SYS_ERR_IOBUFFER, io_usb_out);
+			//reportError("IOgetc USBInEvent err", SYS_ERR_IOBUFFER, io_usb_out);
 			handleError();
 		}
 //		LED1_TOGGLE;
@@ -344,8 +344,8 @@ void USBInEvent() {
 				// We should have read the whole message by now - check
 				if (bytesRead != 0) {
 					// Host sent more data than it promised, error
-					reportError("Host msg err", SYS_ERR_RX_HOST_MSG,
-							io_usb_out);
+					//reportError("Host msg err", SYS_ERR_RX_HOST_MSG,
+					//		io_usb_out);
 					handleError(); // spins in an infinite loop
 				}
 			}

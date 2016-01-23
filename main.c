@@ -87,9 +87,9 @@ int main(void) {
 	}
 
 	// initialize threads
-	if (threadsInit()) {
-		while(1) handleError();
-	}
+//	if (threadsInit()) {
+//		while(1) handleError();
+//	}
 
     // Enable global interrupts after all initialization is finished.
     __enable_interrupt();
@@ -134,7 +134,7 @@ int main(void) {
 			}
 			else {
 				// ERROR. Unrecognized event. Report it.
-				reportError("UnrecognizedEvent", SYS_ERR_EVENT, io_usb_out);
+				//reportError("UnrecognizedEvent", SYS_ERR_EVENT, io_usb_out);
 
 				// Clear all pending events -
 				// attempt to let the system correct itself.
@@ -242,7 +242,7 @@ static int threadsInit() {
 
 	// Initialize pthreads. Use defaults (NULL argument).
 	if (error = pthread_init(NULL)) {
-		reportError("Err-pthread_init", error, io_usb_out);
+		//reportError("Err-pthread_init", error, io_usb_out);
 		return error;
 	}
 
@@ -250,7 +250,7 @@ static int threadsInit() {
 	pthreadHandle_server = pthread_self();
 	if (error = pthread_create(&pthreadHandle_streamer, NULL,
 			streamerThread, NULL)) {
-		reportError("Err-pthread_create(streamer)", error, io_usb_out);
+		//reportError("Err-pthread_create(streamer)", error, io_usb_out);
 		return error;
 	}
 
@@ -265,8 +265,9 @@ static int threadsInit() {
 // this the master is missing a request from the host...
 // but I don't think so. look into this.
 // This function isn't working properly...
-void reportError(char* msg, int err, IObuffer* buff) {
+void reportError(char* msg, int err) {//, IObuffer* buff) {
 	int byteCount;
+	IObuffer* buff = io_usb_out;
 	// Fill up the buffer - it's easier for us to fill up the buffer all the
 	// way than to try to count the size of each error message.
 	// Because the length byte isn't part of the message, put size-1 as length.
@@ -285,6 +286,8 @@ void reportError(char* msg, int err, IObuffer* buff) {
 	// no, buffer is full - didn't finish putting message into buffer.
 	// just send the message as is.
 	while (USBOutEvent(buff)); // keep calling until it returns done.
+
+	__delay_cycles(1000000);
 }
 
 // Just spins in an infinite loop
