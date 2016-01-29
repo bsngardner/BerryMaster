@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include "hal.h"
 #include "msp430.h"
-#include "BerryMaster.h"
 
 //enum used to track state and communicate between sending functions and isr
 typedef enum {
@@ -84,13 +83,11 @@ uint8_t hal_discoverNewDevice(uint8_t new_address) {
 	while (vineSleep)
 		LPM0;
 
-	if (status == NACK) {
-		reportError("nack", 1);
-		return NO_RESPONSE;
-	}
 	if (status == STOP) {
-		reportError("stop", 0);
-		return SUCCESS;
+		return ADDR_ACCEPTED;
+	}
+	if (status == NACK) {
+		return ADDR_REJECTED;
 	}
 	return 1;
 } //End hal_discoverNewDevice()
@@ -110,13 +107,11 @@ uint8_t hal_resetAllDevices() {
 	while (vineSleep)
 		LPM0;
 
-	if (status == NACK) {
-		reportError("nack", 1);
-		return NO_RESPONSE;
-	}
 	if (status == STOP) {
-		reportError("stop", 0);
-		return SUCCESS;
+		return ADDR_ACCEPTED;
+	}
+	if (status == NACK) {
+		return ADDR_REJECTED;
 	}
 	return 0;
 }
@@ -136,13 +131,11 @@ uint8_t hal_pingDevice(uint8_t address) {
 	while (vineSleep)
 		LPM0;
 
-	if (status == NACK) {
-		reportError("nack", 1);
-		return NO_RESPONSE;
-	}
 	if (status == STOP) {
-		reportError("stop", 0);
-		return SUCCESS;
+		return PING;
+	}
+	if (status == NACK) {
+		return NO_RESPONSE;
 	}
 	__no_operation();
 	//oh no
@@ -169,13 +162,11 @@ uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg, uint8_t value) {
 	while (vineSleep)
 		LPM0;
 
-	if (status == NACK) {
-		reportError("nack", 1);
-		return NO_RESPONSE;
-	}
 	if (status == STOP) {
-		reportError("stop", 0);
-		return SUCCESS;
+		return PING;
+	}
+	if (status == NACK) {
+		return NO_RESPONSE;
 	}
 	return 1;
 }
@@ -221,7 +212,7 @@ uint8_t hal_getDeviceMultiRegs(uint8_t address, uint8_t reg,
 	repeat_start = 1;
 	byte_count = count;
 
-	//dma_config(rxPtr, count);
+	dma_config(rxPtr, count);
 
 	vineSleep = 1;
 	status = DATA;
@@ -231,11 +222,9 @@ uint8_t hal_getDeviceMultiRegs(uint8_t address, uint8_t reg,
 		LPM0;
 
 	if (status == NACK) {
-		reportError("nack", 1);
 		return NO_RESPONSE;
 	}
 	if (status == STOP) {
-		reportError("stop", 0);
 		return SUCCESS;
 	}
 	return 3;
@@ -277,7 +266,7 @@ __interrupt void euscib0_isr(void) {
 			UCB0TBCNT = byte_count;
 			UCB0CTLW0 &= ~UCSWRST;
 			UCB0IE = UCNACKIE | UCSTPIE;
-			UCB0IE |= UCRXIE0;
+			//UCB0IE |= UCRXIE0;
 			UCB0CTLW0 |= UCTXSTT;
 
 			repeat_start = 0;

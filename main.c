@@ -78,8 +78,6 @@ pthread_mutex_t hostMutex; // mutex for the host communication (USB)
 int main(void) {
 	int numEventErrors = 0;
 
-	static int cnt = 0; // for debugging
-
 	// initialize the board
 	if (msp430init()) {
 		// error initializing the board - spin in an idle loop
@@ -124,13 +122,6 @@ int main(void) {
 			else if (sys_event & SERVER_EVENT) {
 				sys_event &= ~SERVER_EVENT;
 				serverEvent();
-
-				/* if (++cnt >= 50) {
-					// just for debugging
-					reportError("50 server events", 50, io_usb_out);
-					while (cnt++);
-					cnt = 0;
-				} */
 			}
 			else {
 				// ERROR. Unrecognized event. Report it.
@@ -265,9 +256,9 @@ static int threadsInit() {
 // this the master is missing a request from the host...
 // but I don't think so. look into this.
 // This function isn't working properly...
-void reportError(char* msg, int err) {//, IObuffer* buff) {
+void reportError(char* msg, int err, IObuffer* buff) {
 	int byteCount;
-	IObuffer* buff = io_usb_out;
+	buff = io_usb_out;
 	// Fill up the buffer - it's easier for us to fill up the buffer all the
 	// way than to try to count the size of each error message.
 	// Because the length byte isn't part of the message, put size-1 as length.

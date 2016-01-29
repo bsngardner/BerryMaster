@@ -244,7 +244,7 @@ void clearNetwork();
  * @param err - the error number to print
  * @param buff - the buffer in which to put the message
  */
-void reportError(char* msg, int err);//, IObuffer* buff);
+void reportError(char* msg, int err, IObuffer* buff);
 
 /*
  * spins in an infinite loop, toggling LEDs 0 and 1
