@@ -98,6 +98,7 @@ int serverEvent() {
 	case OPCODE_GET_DEVICE_MULTI_VALUES:
 		// Get specified register values in the berry.
 		rpc_getDeviceMultiValues(sentMessage, len);
+		break;
 	case OPCODE_SET_DEVICE_VALUE:
 		// Set the specified register value in the berry.
 		rpc_setDeviceValue(sentMessage, len);
@@ -185,7 +186,7 @@ void rpc_getDeviceMultiValues(uint8_t* message, uint8_t len) {
 	// read from the berry
 	uint8_t buff[4];
 	//pthread_mutex_lock(&vineMutex);
-	uint8_t result = getDeviceMultiValues(addr, 6, buff, 4);
+	uint8_t result = getDeviceMultiValues(addr, reg, buff, count);
 	//pthread_mutex_unlock(&vineMutex);
 
 	// reply back to the host
