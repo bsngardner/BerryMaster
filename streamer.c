@@ -15,6 +15,7 @@ extern DeviceList_t myDeviceList;
 // The vine mutex
 extern pthread_mutex_t vineMutex;
 
+extern IObuffer* io_usb_out;
 /*
  * streamerThread
  * This is a thread to be created using the pthreads library.
@@ -51,10 +52,10 @@ void* streamerThread() {
 				case 1:
 					break;
 				case TYPE_LED:
-					//pthread_mutex_lock(&vineMutex);
-					//getDeviceValue(dev->deviceAddress, &dev->vals[0], REG_LED0);
-					//pthread_mutex_unlock(&vineMutex);
-					//reportError(dev->vals[0], "led value");
+					pthread_mutex_lock(&vineMutex);
+					getDeviceValue(dev->deviceAddress, &dev->vals[0], REG_LED0);
+					pthread_mutex_unlock(&vineMutex);
+					//reportError("led value", dev->vals[0], io_usb_out);
 					break;
 				case 3:
 					break;
@@ -85,6 +86,6 @@ void* streamerThread() {
 		if (notifyHost) {
 			// todo: values changed - send the host a message
 		}
-		//pthread_yield();
+		pthread_yield();
 	}
 }

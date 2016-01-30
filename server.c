@@ -151,7 +151,7 @@ void rpc_getDeviceType(uint8_t* message, uint8_t len) {
 
 void rpc_getDeviceValue(uint8_t* message, uint8_t len) {
 
-	// reportError("test in getDeviceValue function", 32);
+
 	// get the address from the message
 	uint8_t addr = message[OFFSET_ADDR];
 
@@ -163,6 +163,8 @@ void rpc_getDeviceValue(uint8_t* message, uint8_t len) {
 	//pthread_mutex_lock(&vineMutex);
 	uint8_t result = getDeviceValue(addr, &value, reg);
 	//pthread_mutex_unlock(&vineMutex);
+
+	reportError("is value", value, io_usb_out);
 
 	// reply back to the host.
 	const uint8_t length = STD_REPLY_LENGTH + 1;
