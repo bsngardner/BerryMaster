@@ -26,7 +26,7 @@ volatile int buffLocked = FALSE;
 // The mutex for writing to or reading from the vine.
 // TODO: eventually move this down to HAL code - the closer to the hardware,
 // the better.
-extern //pthread_mutex_t vineMutex;
+//extern pthread_mutex_t vineMutex;
 
 // ----------------------------------------------------------------------------
 // Function prototypes --------------------------------------------------------
@@ -164,7 +164,7 @@ void rpc_getDeviceValue(uint8_t* message, uint8_t len) {
 	uint8_t result = getDeviceValue(addr, &value, reg);
 	//pthread_mutex_unlock(&vineMutex);
 
-	reportError("is value", value, io_usb_out);
+	//reportError("is value", value, io_usb_out);
 
 	// reply back to the host.
 	const uint8_t length = STD_REPLY_LENGTH + 1;

@@ -211,6 +211,7 @@ int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg);
  * @param reg - the register number where we begin to read
  * @param buff - pointer of a buffer to store the values
  * @param count - number of bytes to read
+ * @return 0 for success; nonzero if failed
  */
 int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count);
