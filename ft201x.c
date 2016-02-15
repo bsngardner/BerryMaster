@@ -16,15 +16,13 @@
 #include "ft201x.h"
 #include "events.h"
 
+#define OUT_BUFFER_SIZE 160
+
 // Global variables
 jmp_buf usb_i2c_context;	// error context
 IObuffer* io_usb_out;		// MSP430 to USB buffer
 IObuffer* io_usb_in;		// USB to MSP430 buffer
 
-int insertDC(uint16_t event, uint16_t time);
-
-extern volatile uint16_t sys_event;
-extern char sentMessage[MAX_MSG_LENGTH]; // buffer used for the message
 extern volatile int buffLocked;
 
 // local function prototypes
@@ -34,9 +32,8 @@ inline void ft201x_i2c_out_stop();
 int ft201x_i2c_start_address(uint8_t address);
 void addToMessage(char c);
 
-//*****************************************************************************
+//******************************************************************************
 //	Define port macros for the current board
-#if defined(MAMA_REV_A)
 #define FT201X_I2C_CLOCK_LOW		PJDIR |= ASCL		// put clock low
 #define FT201X_I2C_CLOCK_HIGH		PJDIR &= ~ASCL		// put clock high
 
@@ -44,9 +41,6 @@ void addToMessage(char c);
 #define FT201X_I2C_DATA_HIGH		PJDIR &= ~ASDA		// put data high (pull-up)
 
 #define FT201X_I2C_READ_DATA		PJIN & ASDA		// read state of data pin
-#else
-#error 666
-#endif
 
 #define FT201X_READ_ADDR	0x45
 #define FT201X_WRITE_ADDR	0x44
@@ -84,8 +78,8 @@ int ft201x_flushBuffers() {
 int ft201x_init() {
 
 	// Create an output buffer to send to host
-	io_usb_out = IObuffer_create(MAX_MSG_LENGTH);
-	if (io_usb_out == NULL) {
+	io_usb_out = IObuffer_create(OUT_BUFFER_SIZE);
+	if (io_usb_out == 0) {
 		// Error creating the IO buffer
 		return SYS_ERR_430init;
 	}
@@ -94,12 +88,12 @@ int ft201x_init() {
 	io_usb_out->bytes_ready = USB_Out_callback;
 
 	// Need this input buffer to read data from host.
-	io_usb_in = IObuffer_create(MAX_MSG_LENGTH);
-	if (io_usb_in == NULL) {
+	io_usb_in = IObuffer_create(OUT_BUFFER_SIZE);
+	if (io_usb_in == 0) {
 		// Error creating the IO buffer
 		return SYS_ERR_430init;
 	}
-	io_usb_in->bytes_ready = NULL; // not using a callback for now
+	io_usb_in->bytes_ready = 0; // not using a callback for now
 
 	ft201x_flushBuffers(); // flush the tx and rx buffers
 
@@ -202,6 +196,21 @@ void ft201x_i2c_write(char* data, int16_t bytes) {
 	return;											// return success
 }
 
+void ft201x_i2c_write_io(IObuffer* iob) {
+	int error;
+	uint8_t data;
+	if ((error = ft201x_i2c_start_address(FT201X_WRITE_ADDR)))// output write address
+		longjmp(usb_i2c_context, error);
+
+	while (iob->count) {									// write 8 bits
+		IOgetc((char*) &data, iob);
+		if ((error = ft201x_i2c_out8bits(data)))
+			longjmp(usb_i2c_context, error);		//return error
+	}
+	ft201x_i2c_out_stop();							// output stop
+	return;
+}
+
 //*****************************************************************************
 //	Read a number of bytes from FT201X over I2C. Returns the number of bytes
 //	read, which can easily be less than the number requested.
@@ -251,149 +260,46 @@ int ft201x_i2c_read(int bytes) {
 	return 0;
 }
 
-// Poll the USB input buffer.
-void USBInEvent() {
-	int err = 0;
-	char data = 0;
-	int bytesRead = 0;
-
-	// receive message FSM vars
-	static enum states_e {
-		getSize, getMsg
-	} state = getSize;
-
-	// private message size variable
-	static int msgBytesLeft = 0;
-
-	// the rx buffer index - index of next empty location
-	static unsigned int sentMessage_i = 0;
-
-	// Only read characters if we're ready to read them:
-	if (buffLocked == TRUE) {
-		// the receive buffer is locked, just return
-		return;
+int IOcopy(IObuffer* iodst, IObuffer* iosrc) {
+	__disable_interrupt();
+	char data;
+	while (!IOgetc(&data, iosrc)) {
+		IOputc(data, iodst);
 	}
+	//IOreset_peek(iosrc);
+	return 0;
+}
 
+// Output the out buffer to the usb
+void USBInEvent() {
+	int err;
+	int bytesRead = 0;
 	// Read input characters from computer into io_usb_in
 	if (!(err = setjmp(usb_i2c_context))) {
 		// todo: I need to fix ft201x_i2c_read so I can read multiple bytes
 		// Read 1 byte until there are no more bytes to be read
-		while (!ft201x_i2c_read(1))
-			bytesRead++;
+		while (!ft201x_i2c_read(1)) {
+			LED1_ON;
+			//bytesRead++;
+		}
+//		if (bytesRead) {
+//			//IOcopy(io_usb_out, io_usb_in);
+//		}
+
 	} else {
 		// Error! The error value is the var err
 		// todo: for now, I'll echo the error;
 		// later I want to handle this differently
-		IOputc((char) (err + ASCII_ZERO), io_usb_out);
+		IOputc((char) (err + '0'), io_usb_out);
 		return;
 	}
-
-	// check if any data was actually read
-	if (!bytesRead) {
-		return; // no bytes read
-	}
-
-	// Read the data from the IObuffer until there is no more left to read
-	while (bytesRead) {
-		bytesRead--;
-		// Read the next char
-		if (err = IOgetc(&data, io_usb_in)) {
-			// Error getting character
-			reportError("IOgetc USBInEvent err", SYS_ERR_IOBUFFER);
-			handleError();
-		}
-		LED1_TOGGLE;
-		IOputc(data, io_usb_out);
-		continue;
-
-		// receive message FSM:
-		switch (state) {
-		case getSize:
-			// is the buffer locked?
-			if (buffLocked == FALSE) {
-				// no, get number of bytes of the message
-				msgBytesLeft = (int) (data); // todo: check this!!!
-				// put into buffer:
-				sentMessage[0] = data;
-
-				// prep to store data in buffer:
-				sentMessage_i = 1; // reset buffer index
-				state = getMsg; // go to the get message state
-			}
-			break;
-		case getMsg:
-			// put message into buffer
-			sentMessage[sentMessage_i++] = data;
-
-			// do we expect any more data?
-			msgBytesLeft--;
-			if (msgBytesLeft == 0) {
-				// no, lock the buffer, signal server event,
-				// and go back to initial state
-				buffLocked = TRUE;
-				sys_event |= SERVER_EVENT;
-				state = getSize;
-				// We should have read the whole message by now - check
-				if (bytesRead != 0) {
-					// Host sent more data than it promised, error
-					reportError("Host msg err", SYS_ERR_RX_HOST_MSG);
-					handleError(); // spins in an infinite loop
-				}
-			}
-			break;
-		default:
-			// shouldn't ever get here - default to initial state
-			state = getSize;
-			break;
-		} // end state machine
-	}
-
-	/*
-	 // just for testing - echo the rxed char.
-	 char c;
-	 // Try to read a character from io_usb_in
-	 if (IOgetc(&c, io_usb_in) == 0) {
-	 // Got it. Now try to put it into io_usb_out.
-	 if (IOputc(c, io_usb_out) != 0) {
-	 // error
-	 }
-	 }
-	 */
-
+	send_bytes(io_usb_in);
+	LED1_OFF;
+	return;
 }
 
 // Output the out buffer to the usb
 int USBOutEvent() {
-#define BUF_SIZE 32 // was 16
-
-	LED1_ON; // toggle heartbeat LED
-
-	int i; // byte count
-	char buf[BUF_SIZE]; // out buffer (double buffering is inefficient here...)
-
-	// Copy from IOBuffer into our temp buffer
-	// (TODO: make this direct in ft201x write)
-	for (i = 0; i < BUF_SIZE; ++i) {
-		if (IOgetc(buf + i, io_usb_out)) {
-			break;
-		}
-	}
-
-	// Write the temp buffer out to USB (to computer)
-	if (i) {
-		// todo: do a setjmp here
-//		LED1_ON;
-		ft201x_i2c_write(buf, i);
-//		LED1_OFF;
-	}
-
-	LED1_OFF;
-
-	// If we haven't read everything out of the buffer yet,
-	// come back to this event.
-	if (i == BUF_SIZE) {
-		sys_event |= USB_O_EVENT; // queue up this event again
-		return -1; // signal that we're not done yet
-	}
+	ft201x_i2c_write_io(io_usb_out);
 	return 0; // done with the buffer
 }

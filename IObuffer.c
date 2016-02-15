@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include "IObuffer.h"
+#//#define MSP432
 
 // Write one character to the buffer
 int IOputc(char c, IObuffer* iob) {
@@ -15,11 +16,14 @@ int IOputc(char c, IObuffer* iob) {
 	// Return error if buffer is null or inactive or full
 	if (!iob || !iob->size || (iob->size - iob->count <= 0))
 		return -1; // error
+	// TODO: check for null buffer? (Ouch 6/20/2015)
 
 	// Disable interrupts for interrupt-driven IO
-
+#ifdef MSP432
+	MAP_Interrupt_disableMaster();
+#else
 	__disable_interrupt();
-
+#endif
 	// Get pointer for write location and write to it
 	head_dex = iob->tail_dex + iob->count;
 	if (head_dex >= iob->size)
@@ -33,7 +37,11 @@ int IOputc(char c, IObuffer* iob) {
 	if (!iob->count++ && iob->bytes_ready)
 		iob->bytes_ready();
 
+#ifdef MSP432
+	MAP_Interrupt_disableMaster();
+#else
 	__enable_interrupt();
+#endif
 
 	return 0; // success
 }
@@ -49,7 +57,12 @@ int IOputs(const char* s, IObuffer* iob) {
 	if (!iob || !iob->size || (iob->size - iob->count <= 0))
 		return -1; // error
 
+#ifdef MSP432
+	MAP_Interrupt_disableMaster();
+#else
 	__disable_interrupt();
+#endif
+
 	// Use space_left as an intermediate variable
 	space_left = iob->tail_dex + iob->count;				// index of head
 	if (space_left >= iob->size)
@@ -101,7 +114,11 @@ int IOputs(const char* s, IObuffer* iob) {
 	else
 		__no_operation();
 
+#ifdef MSP432
+	MAP_Interrupt_disableMaster();
+#else
 	__enable_interrupt();
+#endif
 	// Could optionally check if more space has been made available (interrupts)
 
 	// Return byte count, or -1 if the full string was not copied
@@ -129,6 +146,55 @@ int IOgetc(char* cp, IObuffer *iob) {
 		iob->tail_dex -= iob->size;
 	iob->count--;
 
+	if (iob->peek_count)
+		iob->peek_count--; //Possibly reset peek? could also decrement
+
+	return 0;
+}
+
+int IOpeekc(char*cp, IObuffer* iob) {
+	// Return error if buffer is null or inactive or empty or if cp is null
+	if (!iob || !iob->size || !iob->count || !cp)
+		return -1; // error
+
+	if (iob->peek_count >= iob->count)
+		return -1;	//Error - no more for peeking
+
+	//Get peek index, wrap around as necessary
+	int peek_dex = iob->tail_dex + iob->peek_count;
+	if (peek_dex >= iob->size)
+		peek_dex -= iob->size;
+
+	//Load character, increment peek count
+	*cp = *(iob->buffer + peek_dex);
+	iob->peek_count++;
+
+	return 0;
+}
+
+int IOreset_peek(IObuffer* iob) {
+	// Return error if buffer is null or inactive or empty or if cp is null
+	if (!iob || !iob->size || !iob->count)
+		return -1; // error
+
+	//Simply reset peek_count
+	iob->peek_count = 0;
+	return 0;
+}
+
+int IOpop_peek(IObuffer* iob) {
+	// Return error if buffer is null or inactive or empty or if cp is null
+	if (!iob || !iob->size || !iob->count)
+		return -1; // error
+
+	//Jump tail ahead to peek location, wrap around if necessary
+	iob->tail_dex += iob->peek_count;
+	if (iob->tail_dex >= iob->size)
+		iob->tail_dex -= iob->size;
+
+	//Subtract jump amount from count
+	iob->count -= iob->peek_count;
+	iob->peek_count = 0;	//Reset peek count
 	return 0;
 }
 
@@ -152,6 +218,9 @@ IObuffer* IObuffer_create(int size) {
 	iob->count = 0;
 	iob->size = size;
 	iob->bytes_ready = 0;
+	iob->fit_block = 0;
+	iob->blocking_write = 0;
+	iob->peek_count = 0;
 
 	return iob;
 }
@@ -162,15 +231,16 @@ void IObuffer_init(IObuffer* iob, char* buffer, int size, void (*cb)(void)) {
 	iob->count = 0;
 	iob->size = size;
 	iob->bytes_ready = cb;
+	iob->fit_block = 0;
+	iob->blocking_write = 0;
+	iob->peek_count = 0;
 }
 
-void IObuffer_destroy(IObuffer* iob) {
+int IObuffer_destroy(IObuffer* iob) {
 	if (iob) {
-		if (iob->buffer) {
+		if (iob->buffer)
 			free(iob->buffer);
-			iob->buffer = NULL;
-		}
 		free(iob);
-		iob = NULL;
 	}
+	return 0;
 }

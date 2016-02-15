@@ -8,6 +8,7 @@
 #ifndef EVENTS_H_
 #define EVENTS_H_
 #include <stdint.h>
+#include "IObuffer.h"
 
 //Defines
 // Events
@@ -23,8 +24,6 @@
 #define USB_POLL_CNT		32
 #define MAX_EVENT_ERRORS	10
 
-#define TEST_COUNT	50
-
 //Extern variables
 extern volatile uint16_t sys_event;
 //WDT
@@ -36,5 +35,6 @@ extern volatile int hal_cnt;
 //Functions
 extern void event_loop();
 extern void test_event();
+extern void send_bytes(IObuffer*);
 
 #endif /* EVENTS_H_ */

@@ -37,6 +37,7 @@
 // Standard includes
 #include <msp430.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 // Local includes
 #include "BerryMaster.h"
@@ -46,12 +47,15 @@
 #include "server.h"
 #include "hal.h"
 #include "events.h"
+#include "nrfradio.h"
+#include "ioprintf.h"
 
 // Local function prototypes
 static int WDT_init();
 static int setClock();
 static int msp430init();
 
+void WDTdelay(uint16_t time);
 
 extern IObuffer* io_usb_out; // MSP430 to USB buffer
 extern uint16_t i2c_fSCL; // i2c timing constant
@@ -59,8 +63,19 @@ extern uint16_t i2c_fSCL; // i2c timing constant
 /*
  * main.c
  */
-int main(void) {
+void seed_rand() {
+	int16_t seed;
+	int16_t random[16];
+	int i = 16;
+	while (i-- > 0) {
+		seed ^= random[i];
+	}
+	srand(seed);
+	__no_operation();
+}
 
+int main(void) {
+	seed_rand();
 	// initialize the board
 	if (msp430init()) {
 		// error initializing the board - spin in an idle loop
@@ -68,6 +83,12 @@ int main(void) {
 			handleError();
 	}
 	hal_init();
+	spi_init();
+	radio_init(100, 2); //This actually enables interrupts, I want to change that
+	radio_open_pipe(0);
+
+	ioprintf_init(io_usb_out);
+	ioprintf("Initialization complete\n\r");
 	event_loop();
 }
 
@@ -99,7 +120,6 @@ static int WDT_init() {
 	SFRIE1 |= WDTIE; // Enable WDT interrupt
 
 	WDT_cps_cnt = WDT_CLKS_PER_SEC;	// set WD 1 second counter
-	usb_poll_cnt = USB_POLL_CNT; // 1/16 sec
 	return 0;
 }
 
@@ -111,10 +131,10 @@ static int msp430init() {
 	P1SEL0 = P1SEL1 = 0; // Port 1 is GPIO
 	P1DIR = BCLK; // output pins = 1; input = 0
 	// Init button interrupt on port 1:
-	P1REN = SW1 | USBINT; // enable resistors on switch1 and USBINT
-	P1IE = SW1 | USBINT; // enable interrupt for sw1 and usb
-	P1IES = SW1 | USBINT; // interrupt on falling edge
-	P1OUT = SW1 | INT0 | INT1 | USBINT;
+	P1REN = SW1 | USBINT | INT0; // enable resistors on switch1 and USBINT
+	P1IE = SW1 | USBINT | INT0; // enable interrupt for sw1 and usb
+	P1IES = SW1 | USBINT | INT0; // interrupt on falling edge
+	P1OUT = SW1 | INT0 | INT1 | INT0 /*| USBINT*/;
 
 	// Initialize Port 2
 	P2SEL0 = P2SEL1 = 0; // Port 2 is GPIO
@@ -138,24 +158,34 @@ static int msp430init() {
 		reportError("WDTinit err", err);
 		return err;
 	}
+	__enable_interrupt();
+	LED0_ON;
+	WDTdelay(100);
 
 	if (err = setClock()) { // init the clock (also on port J)
 		reportError("setClk err", err);
 		return err;
 	}
+	LED0_OFF;
+	LED1_ON;
+	WDTdelay(100);
 
 	if (err = ft201x_init()) { // init the USB comm chip (ft201x)
 		reportError("ft201x err", err);
 		return err;
 	}
+	LED0_ON;
+	WDTdelay(100);
 
 	if (err = i2c_init()) { // init i2c
 		reportError("i2c err", err);
 		return err;
 	}
+	LED0_OFF;
+	LED1_OFF;
+	WDTdelay(100);
 
 	// Enable global interrupts
-	__enable_interrupt();
 
 	return 0;
 }

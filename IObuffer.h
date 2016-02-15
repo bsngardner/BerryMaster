@@ -16,7 +16,8 @@ typedef struct {
 	void (*bytes_ready)(void);	// callback to wake up writer
 	unsigned int fit_block :1;
 	unsigned int blocking_write :1;
-} IObuffer;
+	int peek_count;
+} IObuffer; //14 bytes
 
 // TODO: Does this (or its declarations) need to be volatile?
 
@@ -29,8 +30,13 @@ int IOputs(const char*, IObuffer*);
 // Reading functions
 int IOgetc(char*, IObuffer*);
 
+//Allowing peeking
+int IOpeekc(char*, IObuffer*);
+int IOreset_peek(IObuffer*);
+int IOpop_peek(IObuffer*);
+
 // Auxiliary functions
 IObuffer* IObuffer_create(int size);
-void IObuffer_destroy(IObuffer* iob);
+int IObuffer_destroy(IObuffer* iob);
 
 #endif /* IOBUFFER_H_ */

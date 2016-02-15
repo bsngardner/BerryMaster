@@ -13,17 +13,30 @@
 #include "ft201x.h"
 #include "server.h"
 #include "ioprintf.h"
+#include "spi.h"
+#include "IObuffer.h"
+#include "nrfradio.h"
 
 volatile uint16_t sys_event;
 
+//Defines
+#define TEST_COUNT 0
+#define USB_POLL_COUNT 10
+
+//Variables
+volatile int test_cnt = 0;
+volatile int usb_poll_cnt = 0;
+
 // Global Variables
 volatile int WDT_cps_cnt;
-volatile int usb_poll_cnt;
 volatile int debounceCnt;
-volatile int test_cnt = 0;
+volatile uint16_t WDT_delay;
 
 void event_loop() {
 	int numEventErrors = 0;
+	usb_poll_cnt = USB_POLL_COUNT;
+	test_cnt = TEST_COUNT;
+	iofprintf(io_usb_out, "Listen!\n\r");
 	// Wait for an interrupt
 	while (1) {
 		// disable interrupts before check sys_event
@@ -82,152 +95,114 @@ static struct {
 	uint8_t val;
 } devices[8] = { 0 };
 
-int i;
+int i, k;
 uint8_t addr = 0x1;
 uint8_t new = 0;
 uint8_t reset = 0;
 
 void test_event() {
-	//iofprintf(io_usb_out, "Listen!\n\r");
-	if (!reset) {
-		hal_resetAllDevices();
-		reset = 1;
-	}
-
-	if (!hal_discoverNewDevice(addr)) {
-		devices[new].addr = addr;
-		hal_getDeviceRegister(devices[new].addr, TYPE_REG,
-				&(devices[new].type));
-		switch (devices[new].type) {
-		case LED_T:
-			hal_setDeviceRegister(devices[new].addr, 2, 1);
-			hal_setDeviceRegister(devices[new].addr, 3, 1);
-			hal_setDeviceRegister(devices[new].addr, 4, 1);
-			hal_setDeviceRegister(devices[new].addr, 5, 1);
-			hal_setDeviceRegister(devices[new].addr, 2, 0);
-			hal_setDeviceRegister(devices[new].addr, 3, 0);
-			hal_setDeviceRegister(devices[new].addr, 4, 0);
-			hal_setDeviceRegister(devices[new].addr, 5, 0);
-			devices[new].reg = devices[new].addr + 1;
-			break;
-		}
-		for (i = 0; i < 8; i++) {
-			if (!devices[i].addr) {
-				new = i;
-				break;
-			}
-		}
-		addr++;
-	}
-	uint8_t buffer[128] = { 0 };
-	for (i = 0; i < 8; i++) {
-
-		if (devices[i].addr) {
-			if (hal_pingDevice(devices[i].addr)) {
-				devices[i].addr = 0;
-			} else {
-				switch (devices[i].type) {
-				case LED_T:
-					devices[i].val ^= 0x01;
-					hal_setDeviceRegister(devices[i].addr, devices[i].reg,
-							devices[i].val);
-					hal_getDeviceMultiRegs(devices[i].addr, 6, buffer, 16);
-					buffer[16] = 0;
-					iofprintf(io_usb_out, "From device %d: ", devices[i].addr);
-					for (i = 0; i < 16; i++) {
-						iofprintf(io_usb_out, "%d ", buffer[i]);
-					}
-					iofprintf(io_usb_out, "\n\r");
-					break;
-				case SW_T:
-					hal_getDeviceRegister(devices[i].addr, devices[i].reg,
-							&(devices[i].val));
-					if (devices[i].val)
-						LED1_ON;
-					else
-						LED1_OFF;
-					break;
-				default:
-					break;
-				}
-			}
-		}
-	}
 	LED0_OFF;
 }
 
+void send_bytes(IObuffer* iob) {
+	radio_sendBytes(0, iob);
+}
+
+void WDTdelay(uint16_t time) {
+	WDT_delay = time;
+	while (WDT_delay)
+		LPM0;
+}
 //-----------------------------------------------------------------------------
 //	Watchdog Timer ISR
 //
 #pragma vector = WDT_VECTOR
 __interrupt void WDT_ISR(void) {
 
-	if (test_cnt) {
-		if (!(--test_cnt)) {
-			test_cnt = TEST_COUNT;
-			sys_event |= TEST_EVENT;
-			__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
-			LED0_ON;
-		}
+	if (test_cnt && !(--test_cnt)) {
+		test_cnt = TEST_COUNT;
+		sys_event |= TEST_EVENT;
+		__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
 	}
 
-	--WDT_cps_cnt;
-	--usb_poll_cnt;
-
-	// One second elapsed
-	if (WDT_cps_cnt == 0) {
-		WDT_cps_cnt = WDT_CLKS_PER_SEC;
+	if (usb_poll_cnt && !(--usb_poll_cnt)) {
+		usb_poll_cnt = USB_POLL_COUNT;
+		sys_event |= USB_I_EVENT;
+		__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
 	}
 //
-//	// Should we poll the USB?
-//	if (usb_poll_cnt == 0) {
-//		sys_event |= USB_I_EVENT; // poll the usb chip (ft201x)
-//		usb_poll_cnt = USB_POLL_CNT; // 1/16 sec
+//	if (!(P1IN & USBINT)) {
+//		sys_event |= USB_I_EVENT;
 //		__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
+//
 //	}
+
+	--WDT_cps_cnt;
+	// One second elapsed
+	if (WDT_cps_cnt == 10) {
+		LED0_ON;
+	}
+	if (WDT_cps_cnt == 0) {
+		WDT_cps_cnt = WDT_CLKS_PER_SEC;
+		sys_event |= TEST_EVENT;
+	}
 
 	// Are we currently debouncing the switch?
 	if (debounceCnt) {
 		// Yes; are we finished?
 		--debounceCnt;
 		if (debounceCnt == 0) {
-			test_cnt = TEST_COUNT;
+			//test_cnt = TEST_COUNT;
 			// TODO: Signal button event.
 		}
 	}
+
+	if (WDT_delay && !(--WDT_delay))
+		__bic_SR_register_on_exit(LPM0_bits);
 }
 
 //-----------------------------------------------------------------------------
 //	Port 1 ISR
 //
+enum {
+	NONE = 0x00, IV1_0 = 0x02, //bit0,0x01
+	IV1_1 = 0x04, //bit1,0x02
+	IV1_2 = 0x06, //bit2,0x04
+	IV1_3 = 0x08, //bit3,0x08
+	IV1_4 = 0x0a, //bit4,0x10
+	IV1_5 = 0x0c, //bit5,0x20
+	IV1_6 = 0x0e, //bit6,0x40
+	IV1_7 = 0x10  //bit7,0x80
+};
 #pragma vector=PORT1_VECTOR
 __interrupt void Port_1_ISR(void) {
-	// USB interrupt?
-	if (P1IFG & USBINT) {
-		// Clear the pending interrupt.
-		P1IFG &= ~USBINT;
 
-		// Signal USB input event
-		sys_event |= USB_I_EVENT;
+	switch (__even_in_range(P1IV, 0x10)) {
+	case NONE:
+		break;
+	case IV1_0: 	//INT
+		spi_start_read();
+		P1IFG &= ~INT0;
+		break;
+	case IV1_3: //SW1
+		debounceCnt = DEBOUNCE_CNT;
+		P1IFG &= ~SW1;
+		break;
+	default:
+		// USB interrupt?
+		if (P1IFG & USBINT) {
+			// Clear the pending interrupt.
+			P1IFG &= ~USBINT;
 
-		// Wake up the processor
-		__bic_SR_register_on_exit(LPM0_bits);
+			// Signal USB input event
+			//sys_event |= USB_I_EVENT;
+
+			// Wake up the processor
+			//__bic_SR_register_on_exit(LPM0_bits);
+		}
+
+		break;
 	}
-
-	// Switch1 interrupt?
-	if (P1IFG & SW1) {
-		debounceCnt = DEBOUNCE_CNT; // set debounce count
-		P1IFG &= ~SW1; // clear interrupt flag
-	}
-
-	// Radio interrupt?
-//	if (P1IFG & INT) {
-//		P1IFG &= ~INT;
-//		if (bdl_config.radio_cfg.radio_mode)
-//			rf_irq |= RF24_IRQ_FLAGGED;
-//		sys_event |= INTERRUPT;
-//		__bic_SR_register_on_exit(LPM0_bits);
-//	}
 
 }
 
