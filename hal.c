@@ -32,7 +32,7 @@ volatile static I2C_STATUS status = STOP;
 #define NEW_ADDR_CMD 0x00
 
 #define CLOCK_SPEED 24000000
-#define I2C_SPEED 500000
+#define I2C_SPEED 1000000
 
 //Addresses
 #define GEN_CALL 0x00

@@ -51,7 +51,7 @@
 #define WDT_CLKS_PER_SEC	512				// 512 Hz WD clock (@32 kHz)
 #define WDT_CTL				WDT_ADLY_1_9	// 1.95 ms
 #define DEBOUNCE_CNT		80
-#define USB_POLL_CNT		4
+#define USB_POLL_CNT		1
 #define MAX_EVENT_ERRORS	10
 
 // Local function prototypes

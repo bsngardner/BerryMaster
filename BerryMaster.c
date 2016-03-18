@@ -84,6 +84,8 @@ int disconnectFromMaster() {
  */
 int initDevices() {
 	int error;
+//	if (error = hal_resetAllDevices())
+//		return error;
 	if (error = hal_init())
 		return error;
 	if (error = validateDeviceList())
