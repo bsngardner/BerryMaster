@@ -299,7 +299,7 @@ void USBInEvent() {
 	}
 
 	// check if any data was actually read
-	if (!bytesRead) {
+	if (bytesRead == 0) {
 		return; // no bytes read
 	}
 

@@ -95,14 +95,12 @@ int main(void) {
 	// Wait for an interrupt
     while(1) {
 		// disable interrupts before check sys_event
-		__disable_interrupt();
-
+    	__disable_interrupt();
     	if (!sys_event) {
 			// no events pending, enable interrupts and goto sleep (LPM0)
 			__bis_SR_register(LPM0_bits | GIE);
 			continue;
 		}
-
     	else {
 			// at least 1 event is pending, enable interrupts before servicing
 			__enable_interrupt();
@@ -152,7 +150,7 @@ static int setClock() {
 
 	// Initialize the crystal
 	CSCTL4 |= (XT1DRIVE1 | XT1DRIVE0);
-// Wait for XT1 to start by trying to clear fault flag until it succeeds
+	// Wait for XT1 to start by trying to clear fault flag until it succeeds
 	CSCTL4 &= ~XT1OFF; // Turn XT1 on--this might be done by itself.
 	do {
 		SFRIFG1 &= ~OFIFG;
@@ -170,7 +168,7 @@ static int WDT_init() {
 	SFRIE1 |= WDTIE; // Enable WDT interrupt
 
 	WDT_cps_cnt = WDT_CLKS_PER_SEC;	// set WD 1 second counter
-	usb_poll_cnt = USB_POLL_CNT; // 1/16 sec
+	usb_poll_cnt = USB_POLL_CNT;
 	return 0;
 }
 
@@ -325,6 +323,7 @@ __interrupt void WDT_ISR(void) {
 		WDT_cps_cnt = WDT_CLKS_PER_SEC;
 		LED0_TOGGLE; // toggle heartbeat LED
 	}
+
 
 	// Should we poll the USB?
 	if (usb_poll_cnt == 0) {
