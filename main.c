@@ -315,17 +315,15 @@ void handleError() {
 #pragma vector = WDT_VECTOR
 __interrupt void WDT_ISR(void) {
 
-	--WDT_cps_cnt;
-	--usb_poll_cnt;
-
 	// One second elapsed
+	--WDT_cps_cnt;
 	if (WDT_cps_cnt == 0) {
 		WDT_cps_cnt = WDT_CLKS_PER_SEC;
 		LED0_TOGGLE; // toggle heartbeat LED
 	}
 
-
 	// Should we poll the USB?
+	--usb_poll_cnt;
 	if (usb_poll_cnt == 0) {
 		sys_event |= USB_I_EVENT; // poll the usb chip (ft201x)
 		usb_poll_cnt = USB_POLL_CNT; // 1/16 sec
