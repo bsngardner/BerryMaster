@@ -32,7 +32,8 @@ static void rpc_getDeviceType();
 static void rpc_getDeviceValue();
 static void rpc_getDeviceMultiValues();
 static void rpc_setDeviceValue();
-static void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff);
+static void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff,
+		uint8_t count);
 
 // ----------------------------------------------------------------------------
 // Functions ------------------------------------------------------------------
@@ -117,7 +118,7 @@ void rpc_initDevices() {
 	uint8_t result = initDevices();
 
 	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH, result, NULL);
+	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
 }
 
 // gets the address from the message
@@ -130,11 +131,12 @@ void rpc_getDeviceType() {
 	IOgetc((char*)&addr, io_usb_in);
 
 	// Get the type of the berry
-	uint8_t type;
-	uint8_t result = getDeviceType(addr, &type);
+	uint8_t type[2];
+	uint8_t result = getDeviceType(addr, type);
+	type[1] = 0;
 
 	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH + 1, result, &type);
+	setReply(STD_REPLY_LENGTH + 1, result, type, 1);
 }
 
 void rpc_getDeviceValue() {
@@ -148,11 +150,12 @@ void rpc_getDeviceValue() {
 	IOgetc((char*)&reg, io_usb_in);
 
 	// Get the value from the device
-	uint8_t value;
-	uint8_t result = getDeviceValue(addr, &value, reg);
+	uint8_t value[2];
+	uint8_t result = getDeviceValue(addr, value, reg);
+	value[1] = 0;
 
 	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH + 1, result, &value);
+	setReply(STD_REPLY_LENGTH + 1, result, value, 1);
 }
 
 void rpc_getDeviceMultiValues() {
@@ -170,11 +173,29 @@ void rpc_getDeviceMultiValues() {
 	IOgetc((char*)&count, io_usb_in);
 
 	// Read from the berry
-	uint8_t buff[count];
-	uint8_t result = getDeviceMultiValues(addr, reg, buff, count);
+	uint8_t buff[MAX_MSG_LENGTH];
+	uint8_t result;
+	if (count > MAX_MSG_LENGTH) {
+		result = READ_BYTES_LENGTH_EXCEEDED; // return error
+		int i;
+		for (i = 0; i < MAX_MSG_LENGTH; i++)
+			buff[i] = 0xff;
+	}
+	else {
+		result = getDeviceMultiValues(addr, reg, buff, count);
+		buff[count] = 0;
+	}
 
 	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH + count, result, buff);
+	setReply(STD_REPLY_LENGTH + count, result, buff, count);
+
+//	IOputc(STD_REPLY_LENGTH + count, io_usb_out);
+//	IOputc((uint8_t)TYPE_REPLY, io_usb_out);
+//	IOputc(result, io_usb_out);
+//	int i;
+//	for (i = 0; i < count; i++) {
+//		IOputc(buff[i], io_usb_out);
+//	}
 }
 
 void rpc_setDeviceValue() {
@@ -195,7 +216,7 @@ void rpc_setDeviceValue() {
 	uint8_t result = setDeviceValue(addr, value, reg);
 
 	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH, result, NULL);
+	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
 }
 
 /*
@@ -208,7 +229,8 @@ void rpc_setDeviceValue() {
  * result - result of the reply
  * buff - additional data to send to the host
  */
-void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff) {
+void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff,
+		uint8_t count) {
 
 	// Standard reply data: length, type, and result
 	IOputc(replyLength, io_usb_out);
@@ -217,6 +239,9 @@ void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff) {
 
 	// Addition values:
 	if (buff) {
-		IOputs((char*)buff, io_usb_out);
+		int i;
+		for (i = 0; i < count; i++) {
+			IOputc(buff[i], io_usb_out);
+		}
 	}
 }

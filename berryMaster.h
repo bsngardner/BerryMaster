@@ -99,6 +99,7 @@ enum SYS_ERRORS {
 #define INVALID_ADDR 		254
 #define DEVICE_NOT_FOUND	253
 #define VALIDATE_LIST_ERR	252
+#define READ_BYTES_LENGTH_EXCEEDED 251
 #define SUCCESS				0
 
 /******************************************************************************
@@ -117,7 +118,7 @@ typedef struct Device {
 
 // Maximum number of devices allowed on the network - limited to 127 because
 // the vine uses 7 address bits, no device will be allowed to use address 0.
-#define MAX_NUM_DEVICES 18u
+#define MAX_NUM_DEVICES 6u
 #define DEVICES_ARRAY_SIZE (MAX_NUM_DEVICES+1)
 
 /* deviceList

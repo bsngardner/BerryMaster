@@ -196,7 +196,7 @@ int ft201x_i2c_start_address(uint8_t address) {
 //	Write entire output io buffer to the FT201X over I2C
 //
 void ft201x_i2c_write(IObuffer* buff) {
-	int error, bytes;
+	int error;
 	char c;
 
 	// Output write address
@@ -204,8 +204,7 @@ void ft201x_i2c_write(IObuffer* buff) {
 		longjmp(usb_i2c_context, error);
 
 	// Write entire output io buffer to usb
-	bytes = buff->count;
-	while (bytes--) {
+	while (buff->count) {
 		// get character from io buffer
 		if (error = IOgetc(&c, buff)) {
 			longjmp(usb_i2c_context, error); // return error
@@ -296,12 +295,6 @@ int USBOutEvent(IObuffer* buff) {
 		// Error!
 		// todo: Is there any way to handle this better?
 		return err;
-	}
-
-	// If we haven't read everything out of the buffer yet,
-	// come back to this event.
-	if (io_usb_out->count) {
-		return -1; // signal that we're not done yet
 	}
 	return 0; // done with the buffer
 }
