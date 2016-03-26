@@ -341,6 +341,7 @@ static uint8_t findUnusedAddress() {
  * @param the variable in which we want to stor the value
  */
 static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value) {
+#define REG_TYPE 0
 	return getDeviceValue(addr, value, REG_TYPE);
 }
 

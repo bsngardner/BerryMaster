@@ -85,40 +85,14 @@ enum SYS_ERRORS {
 	SYS_ERR_MALLOC			// 10 error using malloc
 };
 
-// Events
-#define USB_I_EVENT 0x01
-#define USB_O_EVENT 0x02
-#define SERVER_EVENT 0x04
-
 // Other macros
 #define ASCII_ZERO 48
 #define TRUE 1
 #define FALSE 0
 #define NULL 0
 
-// Device register mapping:
-#define MAX_VALS 4 // the max number of value registers (1 byte ea) in a device
-
-// General registers
-#define REG_TYPE 0
-#define REG_STATUS 1
-
-// LED device
-#define REG_LED0 2
-#define REG_LED1 3
-#define REG_LED2 4
-#define REG_LED3 5
-#define NUM_LEDS 4
-
-// Button device
-#define REG_BTN 2
-
 // Device types
-#define MAX_DEVICE_TYPES 3
 #define UNKNOWN 0
-#define TYPE_LED 2
-#define TYPE_SW 6
-#define TYPE_BUTTON 6
 
 // Errors
 #define NETWORK_FULL		255
@@ -139,7 +113,6 @@ enum SYS_ERRORS {
 typedef struct Device {
 	uint8_t deviceType;
 	uint8_t deviceAddress;
-	uint8_t vals[MAX_VALS];
 } Device_t;
 
 // Maximum number of devices allowed on the network - limited to 127 because

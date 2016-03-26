@@ -15,6 +15,7 @@
 #include "BerryMaster.h"
 #include "server.h"
 #include "ft201x.h"
+#include "events.h"
 
 // Global variables
 jmp_buf usb_i2c_context;	// error context
