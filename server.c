@@ -173,12 +173,12 @@ void rpc_getDeviceMultiValues() {
 	IOgetc((char*)&count, io_usb_in);
 
 	// Read from the berry
-	uint8_t buff[MAX_MSG_LENGTH];
+	uint8_t buff[25];
 	uint8_t result;
-	if (count > MAX_MSG_LENGTH) {
+	if (count > 25) {
 		result = READ_BYTES_LENGTH_EXCEEDED; // return error
 		int i;
-		for (i = 0; i < MAX_MSG_LENGTH; i++)
+		for (i = 0; i < 25; i++)
 			buff[i] = 0xff;
 	}
 	else {
