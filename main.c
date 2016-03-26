@@ -24,24 +24,20 @@
  * J.3	O	ASCL	|	2.5			O	RFCS (Radio chip select)
  */
 
-// TODO's:
-// Develop streamer thread
-// Malloc memory for berries rather than preallocating memory
-// Add Prof Roper's ERROR2() for handling errors in initialization code
-// Fix up ft201x code
-// Add in SPI init code for radio
-// Fix ft201x hardware interrupt - it is always pulling the line low, even
-//   after we empty the hardware buffers (which should let the line float high)
-
+/* TODO's:
+ * Server gets info from the IObuffer
+ * Dynamically allocate the device table
+ */
 
 // Standard includes
 #include <msp430.h>
 #include <stdint.h>
 
+#include "berryMaster.h"
 // Local includes
-#include "BerryMaster.h"
 #include "i2c.h"
 #include "events.h"
+#include "ft201x.h"
 
 // Local function prototypes
 static int setClock();
@@ -147,7 +143,8 @@ void handleError() {
 	volatile int j = 0;
 #define DELAY -30000
 #define DELAY2 5
-	// todo: I don't know what to do besides blink LEDs.
+	// todo: Change this back to Professor Roper's error, where the
+	// LED's blink the error code.
 	// I may want to do some kind of system reset.
 	// Include some close functions on the various peripherals, make sure
 	// that I free memory
@@ -155,8 +152,6 @@ void handleError() {
 	__disable_interrupt(); // Disable interrupts
 	WDTCTL = WDTPW | WDTHOLD; // Turn off watchdog
 	ft201x_close();
-	// todo: pthread_mutex_destroy() on each mutex
-	// todo: pthread_join(pthreadHandle_streamer);
 
 	// Loop forever - short delay between toggling LEDs
 	LED0_OFF;

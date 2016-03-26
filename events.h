@@ -9,9 +9,9 @@
 #define EVENTS_H_
 
 // Events
-#define USB_I_EVENT 0x01
-#define USB_O_EVENT 0x02
-#define SERVER_EVENT 0x04
+#define USB_I_EVENT 	0x01
+#define USB_O_EVENT 	0x02
+#define SERVER_EVENT 	0x04
 
 /*
  * The main loop of the program

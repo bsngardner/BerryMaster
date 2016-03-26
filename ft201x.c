@@ -12,9 +12,10 @@
 
 #include <msp430.h>
 #include <setjmp.h>
-#include "BerryMaster.h"
 #include "server.h"
 #include "ft201x.h"
+
+#include "berryMaster.h"
 #include "events.h"
 
 // Global variables
@@ -59,8 +60,9 @@ void USB_Out_callback() {
 	sys_event |= USB_O_EVENT;
 }
 
-// Does nothing for now
+// Queues server event.
 void USB_In_callback() {
+	sys_event |= SERVER_EVENT;
 	return;
 }
 
@@ -100,7 +102,9 @@ int ft201x_init() {
 		// Error creating the IO buffer
 		return SYS_ERR_430init;
 	}
-	io_usb_in->bytes_ready = NULL; // no callback function
+
+	// Callback function.
+	io_usb_in->bytes_ready = USB_In_callback; // no callback function
 
 	ft201x_flushBuffers(); // flush the tx and rx buffers on ft201x chip
 
@@ -268,109 +272,16 @@ int ft201x_i2c_read(int bytes) {
 
 // Poll the USB input buffer.
 void USBInEvent() {
-	int err = 0;
-	char data = 0;
-	static int bytesRead;
-
-	// receive message FSM vars
-	static enum states_e { getSize, getMsg } state = getSize;
-
-	// private message size variable
-	static int msgBytesLeft = 0;
-
-	// the rx buffer index - index of next empty location
-	static unsigned int sentMessage_i = 0;
-
-	// Only read characters if we're ready to read them:
-	if (buffLocked == TRUE) {
-		// the receive buffer is locked, just return
-		return;
-	}
-
 	// Read input characters from computer into io_usb_in
-	bytesRead = 0;
-	if (!(err = _setjmp(usb_i2c_context))) {
-		// todo: I need to fix ft201x_i2c_read so I can read multiple bytes
+	if (!(setjmp(usb_i2c_context))) {
 		// Read 1 byte until there are no more bytes to be read
-		while(!ft201x_i2c_read(1)) bytesRead++;
+		// io_usb_in will signal the server event if it has data
+		while(!ft201x_i2c_read(1)) LED0_ON;
 	} else {
-		// Error!
-		// todo: How do I handle this?
+		// TODO: ERROR
 		return;
 	}
-
-	// check if any data was actually read
-	if (bytesRead == 0) {
-		return; // no bytes read
-	}
-
-	// Read the data from the IObuffer until there is no more left to read
-	while (bytesRead) {
-		bytesRead--;
-		// Read the next char
-		if (err = IOgetc(&data, io_usb_in)) {
-			// Error getting character
-			//reportError("IOgetc USBInEvent err", SYS_ERR_IOBUFFER, io_usb_out);
-			handleError();
-		}
-//		LED1_TOGGLE;
-
-		// receive message FSM:
-		switch (state) {
-		case getSize:
-			// is the buffer locked?
-			if (buffLocked == FALSE) {
-				// no, get number of bytes of the message
-				msgBytesLeft = (int)(data);
-				// put into buffer:
-				sentMessage[0] = data;
-
-				// prep to store data in buffer:
-				sentMessage_i = 1; // reset buffer index
-				state = getMsg; // go to the get message state
-			}
-			break;
-		case getMsg:
-			// put message into buffer
-			sentMessage[sentMessage_i++] = data;
-
-			// do we expect any more data?
-			msgBytesLeft--;
-			if (msgBytesLeft == 0) {
-				// no, lock the buffer, signal server event,
-				// and go back to initial state
-				buffLocked = TRUE;
-				sys_event |= SERVER_EVENT;
-				state = getSize;
-				// We should have read the whole message by now - check
-				if (bytesRead != 0) {
-					// Host sent more data than it promised, error
-					//reportError("Host msg err", SYS_ERR_RX_HOST_MSG,
-					//		io_usb_out);
-					handleError(); // spins in an infinite loop
-				}
-			}
-			break;
-		default:
-			// shouldn't ever get here - default to initial state
-			state = getSize;
-			break;
-		} // end state machine
-	}
-
-
-	/*
-	// just for testing - echo the rxed char.
-	char c;
-	// Try to read a character from io_usb_in
-	if (IOgetc(&c, io_usb_in) == 0) {
-		// Got it. Now try to put it into io_usb_out.
-		if (IOputc(c, io_usb_out) != 0) {
-			// error
-		}
-	}
-	*/
-
+	LED1_OFF;
 }
 
 // Write the passed in io buffer to the usb

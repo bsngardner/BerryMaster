@@ -9,8 +9,9 @@
 #include <msp430.h>
 
 // Local includes
-#include "BerryMaster.h"
 #include "events.h"
+
+#include "berryMaster.h"
 #include "IObuffer.h"
 #include "server.h"
 #include "ft201x.h"
@@ -34,7 +35,7 @@ void eventsLoop() {
 
 	// Wait for an interrupt
     while(1) {
-		// disable interrupts before check sys_event
+		// Are there events available?
     	__disable_interrupt();
     	if (!sys_event) {
 			// no events pending, enable interrupts and goto sleep (LPM0)
@@ -42,27 +43,33 @@ void eventsLoop() {
 			continue;
 		}
     	else {
-			// at least 1 event is pending, enable interrupts before servicing
+    		// At least 1 event is pending
 			__enable_interrupt();
 
-			// Service any pending events.
-			if (sys_event & USB_I_EVENT) {
-				sys_event &= ~USB_I_EVENT;
-				USBInEvent();
-			}
-			else if (sys_event & USB_O_EVENT) {
+			// Output is ready to be sent to the host:
+			if (sys_event & USB_O_EVENT) {
 				sys_event &= ~USB_O_EVENT;
 				if (USBOutEvent(io_usb_out)) {
 					// We're not finished, queue up this event again.
 					sys_event |= USB_O_EVENT;
 				}
 			}
+
+			// Input is available from the host:
+			else if (sys_event & USB_I_EVENT) {
+				sys_event &= ~USB_I_EVENT;
+				USBInEvent();
+			}
+
+			// Ready to servic a pending request from the host:
 			else if (sys_event & SERVER_EVENT) {
 				sys_event &= ~SERVER_EVENT;
 				serverEvent();
 			}
+
+			// Error - Unrecognized event.
 			else {
-				// ERROR. Unrecognized event. Report it.
+				// TODO: do this right.
 				//reportError("UnrecognizedEvent", SYS_ERR_EVENT, io_usb_out);
 
 				// Clear all pending events -

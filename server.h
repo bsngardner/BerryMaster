@@ -40,8 +40,7 @@
 #define STD_REPLY_LENGTH 2 // type + result = 2 bytes
 
 // message types
-#define TYPE_REPLY 0xFE // rpc reply
-#define TYPE_DEBUG 0xFD // debug
+#define TYPE_REPLY 0xFEu // rpc reply
 #define TYPE_ERROR 0xFCu // error
 
 // opcodes
@@ -51,13 +50,7 @@
 #define OPCODE_GET_DEVICE_MULTI_VALUES 'h'
 #define OPCODE_SET_DEVICE_VALUE 's'
 
-// recv_request return types
-#define RECV_REQ_SUCCESS 0
-#define RECV_REQ_ERROR   1
-#define MSG_NOT_SENT_YET 2
-
 // runs the server for a single remote procedure call
 int serverEvent();
-
 
 #endif /* SERVER_H_ */
