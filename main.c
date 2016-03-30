@@ -57,6 +57,7 @@ int main(void) {
 		while(1) handleError();
 	}
 
+	events_init();
     // Enable global interrupts after all initialization is finished.
     __enable_interrupt();
 

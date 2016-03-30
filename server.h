@@ -7,8 +7,11 @@
 
 #ifndef SERVER_H_
 #define SERVER_H_
-
+//Standard includes
 #include <stdint.h>
+//IO include
+#include "iomatrix.h"
+#include "IObuffer.h"
 
 // defined constants ----------------------------------------------------------
 
@@ -51,6 +54,12 @@
 #define OPCODE_SET_DEVICE_VALUE 's'
 
 // runs the server for a single remote procedure call
+void server_init();
 int serverEvent();
+
+//IO define
+#ifndef SERVER_BUF_SIZE
+#define SERVER_BUF_SIZE 64;
+#endif
 
 #endif /* SERVER_H_ */

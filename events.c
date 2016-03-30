@@ -28,31 +28,44 @@ static volatile int WDT_cps_cnt; // one second counter
 static volatile int usb_poll_cnt; // when 0, the usb is polled for data
 static volatile int debounceCnt; // debounce counter
 volatile uint16_t sys_event; // holds all events
-extern IObuffer* io_usb_out; // MSP430 to USB buffer
+
+//Function prototypes
+void events_usbCallback();
+void events_serverCallback();
+
+//Init all buffer and slot connections
+void events_init() {
+	server_init();
+	server_slot = usb_buffer;
+	usb_slot = server_buffer;
+
+	ft201x_setUSBCallback(events_usbCallback);
+	server_buffer->bytes_ready = events_serverCallback;
+}
 
 void eventsLoop() {
 	int numEventErrors = 0;
 
 	// Wait for an interrupt
-    while(1) {
+	while (1) {
 		// Are there events available?
-    	__disable_interrupt();
-    	if (!sys_event) {
+		__disable_interrupt();
+		if (!sys_event) {
 			// no events pending, enable interrupts and goto sleep (LPM0)
 			__bis_SR_register(LPM0_bits | GIE);
 			continue;
-		}
-    	else {
-    		// At least 1 event is pending
+		} else {
+			// At least 1 event is pending
 			__enable_interrupt();
 
 			// Output is ready to be sent to the host:
 			if (sys_event & USB_O_EVENT) {
 				sys_event &= ~USB_O_EVENT;
-				if (USBOutEvent(io_usb_out)) {
+				if (USBOutEvent()) {
 					// We're not finished, queue up this event again.
 					sys_event |= USB_O_EVENT;
 				}
+				LED1_OFF;
 			}
 
 			// Input is available from the host:
@@ -65,6 +78,12 @@ void eventsLoop() {
 			else if (sys_event & SERVER_EVENT) {
 				sys_event &= ~SERVER_EVENT;
 				serverEvent();
+			}
+
+			// Ready to servic a pending request from the host:
+			else if (sys_event & HEARTBEAT_EVENT) {
+				sys_event &= ~HEARTBEAT_EVENT;
+				LED0_OFF;
 			}
 
 			// Error - Unrecognized event.
@@ -83,32 +102,43 @@ void eventsLoop() {
 					handleError();
 				}
 			}
-    	}
-    }
+		}
+	}
+}
+
+void events_usbCallback() {
+	sys_event |= USB_O_EVENT;
+}
+
+void events_serverCallback() {
+	sys_event |= SERVER_EVENT;
+	LED1_ON;
 }
 
 // Reports an error to the user
 void reportError(char* msg, int err, IObuffer* buff) {
 	int byteCount;
-	buff = io_usb_out;
+	//buff = io_usb_out;
 	// Fill up the buffer - it's easier for us to fill up the buffer all the
 	// way than to try to count the size of each error message.
 	// Because the length byte isn't part of the message, put size-1 as length.
-	IOputc((char)(buff->size-1), buff);
+	IOputc((char) (buff->size - 1), buff);
 	// put the type of message (error) in the buffer
-	IOputc((char)(TYPE_ERROR), buff);
+	IOputc((char) (TYPE_ERROR), buff);
 	// put the error code in
-	IOputc((char)err, buff);
+	IOputc((char) err, buff);
 	// put the message in - count how many bytes that is
 	byteCount = IOputs(msg, buff);
 	// is there space left in the buffer
 	if (byteCount > 0) {
 		// yes, fill up the remaining space with nulls
-		while(IOputc(0, buff) == SUCCESS);
+		while (IOputc(0, buff) == SUCCESS)
+			;
 	}
 	// no, buffer is full - didn't finish putting message into buffer.
 	// just send the message as is.
-	while (USBOutEvent(buff)); // keep calling until it returns done.
+	while (USBOutEvent(buff))
+		; // keep calling until it returns done.
 }
 
 // Initialize the Watchdog Timer
@@ -129,9 +159,11 @@ __interrupt void WDT_ISR(void) {
 
 	// One second elapsed
 	--WDT_cps_cnt;
+	if (WDT_cps_cnt == WDT_CLKS_PER_SEC / 4)
+		LED0_ON; // toggle heartbeat LED
 	if (WDT_cps_cnt == 0) {
 		WDT_cps_cnt = WDT_CLKS_PER_SEC;
-		LED0_TOGGLE; // toggle heartbeat LED
+		sys_event |= HEARTBEAT_EVENT;
 	}
 
 	// Should we poll the USB?
@@ -158,8 +190,7 @@ __interrupt void WDT_ISR(void) {
 //	Port 1 ISR
 //
 #pragma vector=PORT1_VECTOR
-__interrupt void Port_1_ISR(void)
-{
+__interrupt void Port_1_ISR(void) {
 	// USB interrupt?
 	if (P1IFG & USBINT) {
 		// Clear the pending interrupt.
@@ -186,6 +217,5 @@ __interrupt void Port_1_ISR(void)
 //		sys_event |= INTERRUPT;
 //		__bic_SR_register_on_exit(LPM0_bits);
 //	}
-
 
 }

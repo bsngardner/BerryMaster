@@ -40,77 +40,80 @@ int IOputc(char c, IObuffer* iob) {
 
 // Write a C string to the buffer (null terminated!)
 int IOputs(const char* s, IObuffer* iob) {
-	int space_left,		// bytes left to EITHER end of buffer or overflow
-			byte_count = 0;		// bytes written
-	char* write_ptr;	// pointer to which to copy
-	char c = 0xFF;
-
-	// Return error if buffer is null or inactive or full
-	if (!iob || !iob->size || (iob->size - iob->count <= 0))
-		return -1; // error
-
-	__disable_interrupt();
-	// Use space_left as an intermediate variable
-	space_left = iob->tail_dex + iob->count;				// index of head
-	if (space_left >= iob->size)
-		space_left -= iob->size;	// inside of buffer
-
-	// Use the intermediate value to get the pointer to which to write
-	write_ptr = iob->buffer + space_left;
-
-	// Calculate space from write head to end of buffer
-	space_left = iob->size - space_left;
-
-	// Disable interrupts for interrupt-driven IO
-
-	// If the space from the head to the wrap is empty, write to that
-	if (space_left < (iob->size - iob->count)) {
-		while (space_left--) {
-			c = *s++;	// copy from string
-			if (c)
-				byte_count++, *write_ptr++ = c;
-			else
-				break;
-		}
-	}
-
-	// Reset write_ptr to the beginning if we used the first loop
-	if (space_left <= 0)
-		write_ptr = iob->buffer;
-	space_left = iob->size - iob->count - byte_count;
-
-	// Write until buffer is full (either after wrap or having skipped it)
-	if (c) {
-		while (space_left--) {
-			c = *s++;	// copy from string
-			if (c)
-				byte_count++, *write_ptr++ = c;
-			else
-				break;
-		}
-	}
-
-	// Alert the writer (could be if buffer was empty)
-	if (!iob->count && iob->bytes_ready)
-		iob->bytes_ready();
-
-	// Increment IObuffer count
-
-	if ((!c || !iob->fit_block))
-		iob->count += byte_count;
-	else
-		__no_operation();
-
-	__enable_interrupt();
-	// Could optionally check if more space has been made available (interrupts)
-
-	// Return byte count, or -1 if the full string was not copied
-	return c ? -byte_count : byte_count;
-	// then maybe check if more space is available (interrupts)
+	//Counts bytes until null, calls nputs
+	const char* ptr = s;
+	int n = 0;
+	while (*ptr++)
+		n++;
+	return IOnputs(s, n, iob);
 }
 
 //Unfinished, not declared in .h
-int IOputnbytes(const char* s, int n, IObuffer* iob) {
+int IOnputs(const char* src, int n, IObuffer* iob) {
+	int space_left;		// bytes left to EITHER end of buffer or overflow
+	char* write_ptr;		// pointer to which to copy
+
+	// Return error if buffer is null or inactive
+	if (!iob || !iob->size)
+		return -1; // error
+	//Return if buffer is full or bytes will not fit.
+	if (n > iob->size - iob->count)
+		return -1;
+
+	//Precalulate space left until wrap around
+	space_left = iob->tail_dex + iob->count;
+	if (space_left >= iob->size)
+		space_left -= iob->size;	// inside of buffer
+	write_ptr = iob->buffer + space_left; //Sneak in init of write pointer
+	space_left = iob->size - space_left;
+
+	iob->count += n;
+
+	//If there is more space than n, skip first loop and write
+	//	n bytes straight through
+	if (space_left < n) {
+		n -= space_left;
+		while (space_left-- > 0)
+			*write_ptr++ = *src++;
+		write_ptr = iob->buffer;
+	}
+	while (n-- > 0)
+		*write_ptr++ = *src++;
+
+	return 0;
+}
+
+//Unfinished, not declared in .h
+int IOnputs_mem(const char* src, int n, IObuffer* iob) {
+	int space_left;		// bytes left to EITHER end of buffer or overflow
+	char* write_ptr;		// pointer to which to copy
+
+	// Return error if buffer is null or inactive
+	if (!iob || !iob->size)
+		return -1; // error
+	//Return if buffer is full or bytes will not fit.
+	if (n > iob->size - iob->count)
+		return -1;
+
+	//Precalulate space left until wrap around
+	space_left = iob->tail_dex + iob->count;
+	if (space_left >= iob->size)
+		space_left -= iob->size;	// inside of buffer
+	write_ptr = iob->buffer + space_left; //Sneak in init of write pointer
+	space_left = iob->size - space_left;
+
+	iob->count += n;
+
+	//If there is more space than n, skip first loop and write
+	//	n bytes straight through
+	if (space_left < n) {
+		memcpy(write_ptr, src, space_left);
+		n -= space_left;
+		src += space_left;
+		write_ptr = iob->buffer;
+	}
+	memcpy(write_ptr, src, n);
+
 	return 0;
 }
 

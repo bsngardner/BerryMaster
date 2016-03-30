@@ -12,11 +12,13 @@
 #define USB_I_EVENT 	0x01
 #define USB_O_EVENT 	0x02
 #define SERVER_EVENT 	0x04
+#define HEARTBEAT_EVENT 0x80
 
 /*
  * The main loop of the program
  */
 void eventsLoop();
+void events_init();
 
 /*
  * Initialize the Watchdog Timer

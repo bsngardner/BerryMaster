@@ -19,8 +19,8 @@
 // ----------------------------------------------------------------------------
 // Global variables -----------------------------------------------------------
 // ----------------------------------------------------------------------------
-extern IObuffer* io_usb_in;
-extern IObuffer* io_usb_out;
+IObuffer* server_buffer;
+IObuffer* server_slot;
 
 // ----------------------------------------------------------------------------
 // Function prototypes --------------------------------------------------------
@@ -35,9 +35,27 @@ static void rpc_setDeviceValue();
 static void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff,
 		uint8_t count);
 
+//Macros
+#define READ(dest) IOgetc((char*)&(dest), server_buffer)
+#define WRITE(src) IOputc((char)(src),server_slot);
+#define WRITE_S(src) IOputs((const char*)(src),server_slot)
+#define WRITE_N(src,n) IOnputs((const char*)(src),(n),server_slot)
+
 // ----------------------------------------------------------------------------
 // Functions ------------------------------------------------------------------
 // ----------------------------------------------------------------------------
+
+void server_init() {
+	//Allocate buffer.  This function must be called before assigning any slots
+	//	to server buffer.  Clearly.
+	//Size is defined, in priority order, by
+	//	any define before iomatrix.h, by iomatrix.h and by server.h
+	server_buffer = IObuffer_create(SERVER_BUF_SIZE);
+	if (server_buffer == 0) {
+		while (1)
+			;	//Report error somehow
+	}
+}
 
 /*
  * Services a pending request from the host.
@@ -52,13 +70,13 @@ int serverEvent() {
 	}
 
 	// get the opcode from the message
-	if (error = IOgetc((char*)&opcode, io_usb_in)) {
+	if (error = READ(opcode)) {
 		// TODO: handle this better
 		return error;
 	}
 
 	// handle the request:
-	switch(opcode) {
+	switch (opcode) {
 	case OPCODE_INIT_DEVICES:
 		// init the network (also sends a reply to the host)
 		rpc_initDevices();
@@ -92,19 +110,19 @@ int serverEvent() {
  */
 int isValidMessage() {
 	int error;
-	uint8_t length;
+	static uint8_t length;
 
 	// Get the length of the incoming message.
-	if (error = IOgetc((char*)&length, io_usb_in)) {
+	if (!length && (error = READ(length))) {
 		return error;
 	}
 
 	// Make sure we have the full message. If we don't, return an error.
-	if (io_usb_in->count < length) {
+	if (server_buffer->count < length) {
 		// Don't have the full message, return error.
 		return -2;
 	}
-
+	length = 0;
 	// We have a full message.
 	return SUCCESS;
 }
@@ -128,7 +146,7 @@ void rpc_getDeviceType() {
 
 	// Get the address from the message
 	uint8_t addr;
-	IOgetc((char*)&addr, io_usb_in);
+	READ(addr);
 
 	// Get the type of the berry
 	uint8_t type[2];
@@ -143,11 +161,11 @@ void rpc_getDeviceValue() {
 
 	// Get the address from the message
 	uint8_t addr;
-	IOgetc((char*)&addr, io_usb_in);
+	READ(addr);
 
 	// Get the register from the message
 	uint8_t reg;
-	IOgetc((char*)&reg, io_usb_in);
+	READ(reg);
 
 	// Get the value from the device
 	uint8_t value[2];
@@ -162,15 +180,15 @@ void rpc_getDeviceMultiValues() {
 
 	// Get the address from the message
 	uint8_t addr;
-	IOgetc((char*)&addr, io_usb_in);
+	READ(addr);
 
 	// Get the register from the message
 	uint8_t reg;
-	IOgetc((char*)&reg, io_usb_in);
+	READ(reg);
 
 	// Number of bytes to read
 	uint8_t count;
-	IOgetc((char*)&count, io_usb_in);
+	READ(count);
 
 	// Read from the berry
 	uint8_t buff[25];
@@ -180,8 +198,7 @@ void rpc_getDeviceMultiValues() {
 		int i;
 		for (i = 0; i < 25; i++)
 			buff[i] = 0xff;
-	}
-	else {
+	} else {
 		result = getDeviceMultiValues(addr, reg, buff, count);
 		buff[count] = 0;
 	}
@@ -202,15 +219,15 @@ void rpc_setDeviceValue() {
 
 	// Get the address from the message
 	uint8_t addr;
-	IOgetc((char*)&addr, io_usb_in);
+	READ(addr);
 
 	// Get the register from the message
 	uint8_t reg;
-	IOgetc((char*)&reg, io_usb_in);
+	READ(reg);
 
 	// Get the value from the message
 	uint8_t value;
-	IOgetc((char*)&value, io_usb_in);
+	READ(value);
 
 	// Set the value in the device
 	uint8_t result = setDeviceValue(addr, value, reg);
@@ -229,19 +246,14 @@ void rpc_setDeviceValue() {
  * result - result of the reply
  * buff - additional data to send to the host
  */
-void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff,
-		uint8_t count) {
+void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff, uint8_t count) {
 
 	// Standard reply data: length, type, and result
-	IOputc(replyLength, io_usb_out);
-	IOputc((uint8_t)TYPE_REPLY, io_usb_out);
-	IOputc(result, io_usb_out);
+	WRITE(replyLength);
+	WRITE(TYPE_REPLY);
+	WRITE(result);
 
-	// Addition values:
-	if (buff) {
-		int i;
-		for (i = 0; i < count; i++) {
-			IOputc(buff[i], io_usb_out);
-		}
-	}
+	if (buff)
+		WRITE_N(buff, count);
+	return;
 }

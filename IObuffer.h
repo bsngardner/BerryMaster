@@ -25,6 +25,7 @@ typedef struct {
 // Writing functions
 int IOputc(char, IObuffer*);
 int IOputs(const char*, IObuffer*);
+int IOnputs(const char*, int, IObuffer*);
 
 // Reading functions
 int IOgetc(char*, IObuffer*);

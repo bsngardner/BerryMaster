@@ -20,8 +20,8 @@
 
 // Global variables
 jmp_buf usb_i2c_context;	// error context
-IObuffer* io_usb_out;		// MSP430 to USB buffer
-IObuffer* io_usb_in;		// USB to MSP430 buffer
+IObuffer* usb_buffer;		// MSP430 to USB buffer
+IObuffer* usb_slot;		// USB to MSP430 buffer
 
 int insertDC(uint16_t event, uint16_t time);
 
@@ -55,15 +55,8 @@ void addToMessage(char c);
 
 //*****************************************************************************
 
-// Queues USB out event
-void USB_Out_callback() {
-	sys_event |= USB_O_EVENT;
-}
-
-// Queues server event.
-void USB_In_callback() {
-	sys_event |= SERVER_EVENT;
-	return;
+void ft201x_setUSBCallback(void (*callback)(void)) {
+	usb_buffer->bytes_ready = callback;
 }
 
 // Flush the ft201x tx and rx buffers
@@ -87,24 +80,13 @@ int ft201x_flushBuffers() {
 int ft201x_init() {
 
 	// Create an output buffer to send to host
-	io_usb_out = IObuffer_create(MAX_MSG_LENGTH);
-	if (io_usb_out == NULL) {
-		// Error creating the IO buffer
+	usb_buffer = IObuffer_create(USB_BUF_SIZE);
+	if (usb_buffer == NULL) {
+		// Error creating the USB IO buffer
 		return SYS_ERR_430init;
 	}
 
-	// Set custom callback function.
-	io_usb_out->bytes_ready = USB_Out_callback;
-
-	// Need this input buffer to read data from host.
-	io_usb_in = IObuffer_create(MAX_MSG_LENGTH);
-	if (io_usb_in == NULL) {
-		// Error creating the IO buffer
-		return SYS_ERR_430init;
-	}
-
-	// Callback function.
-	io_usb_in->bytes_ready = USB_In_callback; // no callback function
+	usb_slot = 0;
 
 	ft201x_flushBuffers(); // flush the tx and rx buffers on ft201x chip
 
@@ -116,8 +98,7 @@ int ft201x_init() {
 //  For now, just free the io buffers
 //
 void ft201x_close() {
-	IObuffer_destroy(io_usb_in);
-	IObuffer_destroy(io_usb_out);
+	IObuffer_destroy(usb_buffer);
 }
 
 //*****************************************************************************
@@ -195,7 +176,7 @@ int ft201x_i2c_start_address(uint8_t address) {
 //*****************************************************************************
 //	Write entire output io buffer to the FT201X over I2C
 //
-void ft201x_i2c_write(IObuffer* buff) {
+void ft201x_i2c_write() {
 	int error;
 	char c;
 
@@ -204,9 +185,9 @@ void ft201x_i2c_write(IObuffer* buff) {
 		longjmp(usb_i2c_context, error);
 
 	// Write entire output io buffer to usb
-	while (buff->count) {
+	while (usb_buffer->count) {
 		// get character from io buffer
-		if (error = IOgetc(&c, buff)) {
+		if (error = IOgetc(&c, usb_buffer)) {
 			longjmp(usb_i2c_context, error); // return error
 		}
 		// write 8 bits
@@ -223,9 +204,10 @@ void ft201x_i2c_write(IObuffer* buff) {
 //	read, which can easily be less than the number requested.
 //
 // TODO: do this right
-int ft201x_i2c_read(int bytes) {
+int ft201x_i2c_read() {
 	uint8_t i, data;
 	int16_t error;
+	uint16_t bytes = 1;
 
 	if ((error = ft201x_i2c_start_address(FT201X_READ_ADDR)))// output read address
 	{
@@ -248,7 +230,7 @@ int ft201x_i2c_read(int bytes) {
 				data++;
 		}
 		// save data
-		if (error = IOputc(data, io_usb_in))
+		if (error = IOputc(data, usb_slot))
 		{
 			ft201x_i2c_out_stop();
 			longjmp(usb_i2c_context, error);
@@ -269,13 +251,15 @@ int ft201x_i2c_read(int bytes) {
 	return 0;
 }
 
+
+
 // Poll the USB input buffer.
 void USBInEvent() {
 	// Read input characters from computer into io_usb_in
 	if (!(setjmp(usb_i2c_context))) {
 		// Read 1 byte until there are no more bytes to be read
 		// io_usb_in will signal the server event if it has data
-		while(!ft201x_i2c_read(1)) LED0_ON;
+		while(!ft201x_i2c_read()) LED0_ON;
 	} else {
 		// TODO: ERROR
 		return;
@@ -284,13 +268,13 @@ void USBInEvent() {
 }
 
 // Write the passed in io buffer to the usb
-int USBOutEvent(IObuffer* buff) {
+int USBOutEvent() {
 	int err;
 
 	// set context restore point
 	if (!(err = _setjmp(usb_i2c_context))) {
 		// write buffer out to usb
-		ft201x_i2c_write(buff);
+		ft201x_i2c_write();
 	} else {
 		// Error!
 		// todo: Is there any way to handle this better?
