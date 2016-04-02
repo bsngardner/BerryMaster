@@ -259,12 +259,11 @@ void USBInEvent() {
 	if (!(setjmp(usb_i2c_context))) {
 		// Read 1 byte until there are no more bytes to be read
 		// io_usb_in will signal the server event if it has data
-		while(!ft201x_i2c_read()) LED0_ON;
+		while(!ft201x_i2c_read());
 	} else {
 		// TODO: ERROR
 		return;
 	}
-	LED1_OFF;
 }
 
 // Write the passed in io buffer to the usb
