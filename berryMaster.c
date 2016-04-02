@@ -102,15 +102,20 @@ int initDevices() {
  * @return SUCCESS for success; 1 if the device is not on the network.
  */
 int getDeviceType(uint8_t addr, uint8_t* deviceType) {
+	// Is it a valid address?
+	if (addr <= 0 || addr > MAX_NUM_DEVICES) {
+		*deviceType = UNKNOWN;
+		return INVALID_ADDR;
+	}
 	// Is there a device at this address?
 	if (!addrIsUsed(addr)) {
 		// No - return failed.
-		*deviceType = (int)UNKNOWN;
+		*deviceType = UNKNOWN;
 		return DEVICE_NOT_FOUND;
 	}
 	else {
 		// Yes, there is a device - set the type and return success.
-		*deviceType = (int)myDeviceList.devices[addr].deviceType;
+		*deviceType = myDeviceList.devices[addr].deviceType;
 		return SUCCESS;
 	}
 }
