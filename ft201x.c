@@ -20,8 +20,8 @@
 
 // Global variables
 jmp_buf usb_i2c_context;	// error context
-IObuffer* usb_buffer;		// MSP430 to USB buffer
-IObuffer* usb_slot;		// USB to MSP430 buffer
+IObuffer* usb_buffer;		// MSP430 to USB buffer - Consumers
+IObuffer* usb_slot;		// USB to MSP430 buffer - Producers
 
 int insertDC(uint16_t event, uint16_t time);
 
@@ -191,7 +191,7 @@ void ft201x_i2c_write() {
 			longjmp(usb_i2c_context, error); // return error
 		}
 		// write 8 bits
-		if ((error = ft201x_i2c_out8bits((uint8_t)c))) {
+		if ((error = ft201x_i2c_out8bits((uint8_t) c))) {
 			longjmp(usb_i2c_context, error); //return error
 		}
 	}
@@ -207,7 +207,6 @@ void ft201x_i2c_write() {
 int ft201x_i2c_read() {
 	uint8_t i, data;
 	int16_t error;
-	uint16_t bytes = 1;
 
 	if ((error = ft201x_i2c_start_address(FT201X_READ_ADDR)))// output read address
 	{
@@ -217,33 +216,26 @@ int ft201x_i2c_read() {
 			longjmp(usb_i2c_context, error);	// unrecognized error
 	}
 
-	// TODO: when there is a CBUS pin
-	while (bytes--)								// read 8 bits
-	{
-		for (i = 8; i > 0; i--)
-		{
-			FT201X_I2C_CLOCK_LOW;	// I2C_CLOCK_LOW;
-			FT201X_I2C_DATA_HIGH;	// high impedance
-			FT201X_I2C_CLOCK_HIGH;	// I2C_CLOCK_HIGH;
-			data <<= 1;				// assume 0
-			if (FT201X_I2C_READ_DATA)
-				data++;
-		}
-		// save data
-		if (error = IOputc(data, usb_slot))
-		{
-			ft201x_i2c_out_stop();
-			longjmp(usb_i2c_context, error);
-		}
-
-		// output ack or nack
-		FT201X_I2C_CLOCK_LOW;				// I2C_CLOCK_LOW;
-		if (bytes)
-			FT201X_I2C_DATA_LOW;			// ack (0)
-		else
-			FT201X_I2C_DATA_HIGH;			// nack (1)
-		FT201X_I2C_CLOCK_HIGH;				// I2C_CLOCK_HIGH;
+	for (i = 8; i > 0; i--) {
+		FT201X_I2C_CLOCK_LOW;	// I2C_CLOCK_LOW;
+		FT201X_I2C_DATA_HIGH;	// high impedance
+		FT201X_I2C_CLOCK_HIGH;	// I2C_CLOCK_HIGH;
+		data <<= 1;				// assume 0
+		if (FT201X_I2C_READ_DATA)
+			data++;
 	}
+	// save data
+	if (error = IOputc(data, usb_slot)) {
+		ft201x_i2c_out_stop();
+		longjmp(usb_i2c_context, error);
+	}
+
+	// output ack or nack
+	FT201X_I2C_CLOCK_LOW;				// I2C_CLOCK_LOW;
+
+	FT201X_I2C_DATA_HIGH;			// nack (1)
+	FT201X_I2C_CLOCK_HIGH;				// I2C_CLOCK_HIGH;
+
 	ft201x_i2c_out_stop();					// output stop
 
 	// TODO: this is not the number of bytes you are looking for!
@@ -251,20 +243,18 @@ int ft201x_i2c_read() {
 	return 0;
 }
 
-
-
 // Poll the USB input buffer.
 void USBInEvent() {
 	// Read input characters from computer into io_usb_in
 	if (!(setjmp(usb_i2c_context))) {
 		// Read 1 byte until there are no more bytes to be read
 		// io_usb_in will signal the server event if it has data
-		while(!ft201x_i2c_read()) LED0_ON;
+		while (!ft201x_i2c_read())
+			;
 	} else {
 		// TODO: ERROR
 		return;
 	}
-	LED1_OFF;
 }
 
 // Write the passed in io buffer to the usb

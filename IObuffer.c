@@ -53,6 +53,7 @@ int IOnputs(const char* src, int n, IObuffer* iob) {
 	int space_left;		// bytes left to EITHER end of buffer or overflow
 	char* write_ptr;		// pointer to which to copy
 
+	__disable_interrupt();
 	// Return error if buffer is null or inactive
 	if (!iob || !iob->size)
 		return -1; // error
@@ -67,7 +68,7 @@ int IOnputs(const char* src, int n, IObuffer* iob) {
 	write_ptr = iob->buffer + space_left; //Sneak in init of write pointer
 	space_left = iob->size - space_left;
 
-	iob->count += n;
+	int new_count = iob->count + n;
 
 	//If there is more space than n, skip first loop and write
 	//	n bytes straight through
@@ -80,6 +81,11 @@ int IOnputs(const char* src, int n, IObuffer* iob) {
 	while (n-- > 0)
 		*write_ptr++ = *src++;
 
+	if (!iob->count && iob->bytes_ready)
+		iob->bytes_ready();
+	iob->count = new_count;
+
+	__enable_interrupt();
 	return 0;
 }
 

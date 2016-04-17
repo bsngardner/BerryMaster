@@ -54,16 +54,17 @@ int main(void) {
 	// initialize the board
 	if (msp430init()) {
 		// error initializing the board - spin in an idle loop
-		while(1) handleError();
+		while (1)
+			handleError();
 	}
 
 	events_init();
-    // Enable global interrupts after all initialization is finished.
-    __enable_interrupt();
+	// Enable global interrupts after all initialization is finished.
+	__enable_interrupt();
 
-    while(1) {
-    	eventsLoop();
-    }
+	while (1) {
+		eventsLoop();
+	}
 }
 
 // Initialize the msp430 clock and crystal
@@ -96,10 +97,10 @@ static int msp430init() {
 	P1SEL0 = P1SEL1 = 0; // Port 1 is GPIO
 	P1DIR = BCLK; // output pins = 1; input = 0
 	// Init button interrupt on port 1:
-	P1REN = SW1 | USBINT; // enable resistors on switch1 and USBINT
-	P1IE = SW1 | USBINT; // enable interrupt for sw1 and usb
-	P1IES = SW1 | USBINT; // interrupt on falling edge
-	P1OUT = SW1 | INT0 | INT1 | USBINT;
+	P1REN = SW1 | INT0; // enable resistors on switch1 and USBINT
+	P1IE = SW1 | INT0; // enable interrupt for sw1 and usb
+	P1IES = SW1 | INT0; // interrupt on falling edge
+	P1OUT = SW1 | INT0 | INT1;
 
 	// Initialize Port 2
 	P2SEL0 = P2SEL1 = 0; // Port 2 is GPIO
@@ -113,27 +114,27 @@ static int msp430init() {
 	PJSEL0 = 0x30;
 	PJSEL1 = 0;
 	PJREN &= ~0x0f; // no pull-up resistors
-    PJDIR = LED0 | LED1 | 0xC0; // LEDs and unused pins are output
+	PJDIR = LED0 | LED1 | 0xC0; // LEDs and unused pins are output
 	PJOUT &= ~0x0f; // all output pins low
 
-    // Special init functions for the peripherals - if an error occurs
-    // (a function returns non-zero), then print the error to the console:
+	// Special init functions for the peripherals - if an error occurs
+	// (a function returns non-zero), then print the error to the console:
 
 	if (err = WDT_init()) { // init the watchdog timer
 		return err;
 	}
 
-    if (err = setClock()) { // init the clock (also on port J)
-    	return err;
-    }
+	if (err = setClock()) { // init the clock (also on port J)
+		return err;
+	}
 
-    if (err = ft201x_init()) { // init the USB comm chip (ft201x)
-    	return err;
-    }
+	if (err = ft201x_init()) { // init the USB comm chip (ft201x)
+		return err;
+	}
 
-    if (err = i2c_init()) { // init i2c
-    	return err;
-    }
+	if (err = i2c_init()) { // init i2c
+		return err;
+	}
 
 	return 0;
 }
@@ -161,11 +162,10 @@ void handleError() {
 		j = DELAY2;
 		while (j-- != 0) {
 			i = DELAY;
-			while (i-- != 0);
+			while (i-- != 0)
+				;
 		}
 		LEDS_TOGGLE;
 	}
 }
-
-
 

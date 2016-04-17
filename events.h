@@ -11,7 +11,10 @@
 // Events
 #define USB_I_EVENT 	0x01
 #define USB_O_EVENT 	0x02
-#define SERVER_EVENT 	0x04
+#define NRF_EVENT		0x04
+#define SERVER_EVENT 	0x08
+#define TEST_EVENT		0x20
+#define TEST_RX_EVENT	0x40
 #define HEARTBEAT_EVENT 0x80
 
 /*
