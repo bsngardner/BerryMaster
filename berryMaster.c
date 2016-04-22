@@ -110,8 +110,8 @@ int initDevices(uint8_t project_hash)
 	if (project_hash != stored_project_hash)
 	{
 		clearNetwork();
-		//	if (error = hal_resetAllDevices())
-		//		return error;
+		if (error = hal_resetAllDevices())
+			return error;
 		stored_project_hash = project_hash;
 	}
 	// If it is the same, validate the device list we have.
