@@ -45,13 +45,15 @@ static void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff,
 // Functions ------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 
-void server_init() {
+void server_init()
+{
 	//Allocate buffer.  This function must be called before assigning any slots
 	//	to server buffer.  Clearly.
 	//Size is defined, in priority order, by
 	//	any define before iomatrix.h, by iomatrix.h and by server.h
 	server_buffer = IObuffer_create(SERVER_BUF_SIZE);
-	if (server_buffer == 0) {
+	if (server_buffer == 0)
+	{
 		while (1)
 			;	//Report error somehow
 	}
@@ -60,23 +62,27 @@ void server_init() {
 /*
  * Services a pending request from the host.
  */
-int serverEvent() {
+int serverEvent()
+{
 	uint8_t opcode;
 	int error;
 
 	// get the message:
-	if (error = isValidMessage()) {
+	if (error = isValidMessage())
+	{
 		return error;
 	}
 
 	// get the opcode from the message
-	if (error = READ(opcode)) {
+	if (error = READ(opcode))
+	{
 		// TODO: handle this better
 		return error;
 	}
 
 	// handle the request:
-	switch (opcode) {
+	switch (opcode)
+	{
 	case OPCODE_INIT_DEVICES:
 		// init the network (also sends a reply to the host)
 		rpc_initDevices();
@@ -108,17 +114,20 @@ int serverEvent() {
  * Vaildates the message from the host - don't service if message is
  * invalid or incomplete.
  */
-int isValidMessage() {
+int isValidMessage()
+{
 	int error;
 	static uint8_t length;
 
 	// Get the length of the incoming message.
-	if (!length && (error = READ(length))) {
+	if (!length && (error = READ(length)))
+	{
 		return error;
 	}
 
 	// Make sure we have the full message. If we don't, return an error.
-	if (server_buffer->count < length) {
+	if (server_buffer->count < length)
+	{
 		// Don't have the full message, return error.
 		return -2;
 	}
@@ -130,10 +139,15 @@ int isValidMessage() {
 /*
  * calls master initDevices function and sends a reply back to the host
  */
-void rpc_initDevices() {
+void rpc_initDevices()
+{
+
+	// Get the project has from the message
+	uint8_t project_hash;
+	READ(project_hash);
 
 	// Call init devices
-	uint8_t result = initDevices();
+	uint8_t result = initDevices(project_hash);
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
@@ -142,7 +156,8 @@ void rpc_initDevices() {
 // gets the address from the message
 // calls master getDeviceType
 // and sends reply back to host
-void rpc_getDeviceType() {
+void rpc_getDeviceType()
+{
 
 	// Get the address from the message
 	uint8_t addr;
@@ -157,7 +172,8 @@ void rpc_getDeviceType() {
 	setReply(STD_REPLY_LENGTH + 1, result, type, 1);
 }
 
-void rpc_getDeviceValue() {
+void rpc_getDeviceValue()
+{
 
 	// Get the address from the message
 	uint8_t addr;
@@ -176,7 +192,8 @@ void rpc_getDeviceValue() {
 	setReply(STD_REPLY_LENGTH + 1, result, value, 1);
 }
 
-void rpc_getDeviceMultiValues() {
+void rpc_getDeviceMultiValues()
+{
 
 	// Get the address from the message
 	uint8_t addr;
@@ -193,12 +210,15 @@ void rpc_getDeviceMultiValues() {
 	// Read from the berry
 	uint8_t buff[25];
 	uint8_t result;
-	if (count > 25) {
+	if (count > 25)
+	{
 		result = READ_BYTES_LENGTH_EXCEEDED; // return error
 		int i;
 		for (i = 0; i < 25; i++)
 			buff[i] = 0xff;
-	} else {
+	}
+	else
+	{
 		result = getDeviceMultiValues(addr, reg, buff, count);
 		buff[count] = 0;
 	}
@@ -215,7 +235,8 @@ void rpc_getDeviceMultiValues() {
 //	}
 }
 
-void rpc_setDeviceValue() {
+void rpc_setDeviceValue()
+{
 
 	// Get the address from the message
 	uint8_t addr;
@@ -246,7 +267,8 @@ void rpc_setDeviceValue() {
  * result - result of the reply
  * buff - additional data to send to the host
  */
-void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff, uint8_t count) {
+void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff, uint8_t count)
+{
 
 	// Standard reply data: length, type, and result
 	WRITE(replyLength);

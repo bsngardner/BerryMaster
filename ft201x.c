@@ -55,12 +55,14 @@ void addToMessage(char c);
 
 //*****************************************************************************
 
-void ft201x_setUSBCallback(void (*callback)(void)) {
+void ft201x_setUSBCallback(void (*callback)(void))
+{
 	usb_buffer->bytes_ready = callback;
 }
 
 // Flush the ft201x tx and rx buffers
-int ft201x_flushBuffers() {
+int ft201x_flushBuffers()
+{
 	// Make a global i2c call
 	ft201x_i2c_start_address(0);
 
@@ -77,11 +79,13 @@ int ft201x_flushBuffers() {
 //*****************************************************************************
 //
 //
-int ft201x_init() {
+int ft201x_init()
+{
 
 	// Create an output buffer to send to host
 	usb_buffer = IObuffer_create(USB_BUF_SIZE);
-	if (usb_buffer == NULL) {
+	if (usb_buffer == NULL)
+	{
 		// Error creating the USB IO buffer
 		return SYS_ERR_430init;
 	}
@@ -97,7 +101,8 @@ int ft201x_init() {
 //*****************************************************************************
 //  For now, just free the io buffers
 //
-void ft201x_close() {
+void ft201x_close()
+{
 	IObuffer_destroy(usb_buffer);
 }
 
@@ -105,7 +110,8 @@ void ft201x_close() {
 //	Inline function for a single bit. Could use some heavy optimization, but
 //	I'm not sure if the bus could handle full speed at higher clock rates.
 //
-inline void ft201x_i2c_out_bit(uint8_t bit) {
+inline void ft201x_i2c_out_bit(uint8_t bit)
+{
 	FT201X_I2C_CLOCK_LOW;				// drop clock
 	if (bit)
 		FT201X_I2C_DATA_HIGH;			// set SDA high
@@ -120,11 +126,13 @@ inline void ft201x_i2c_out_bit(uint8_t bit) {
 //	that probably could be handled a little more civilly, since NACK is used
 //	to represent no data available on the FT201X.
 //
-int ft201x_i2c_out8bits(uint8_t c) {
+int ft201x_i2c_out8bits(uint8_t c)
+{
 	uint8_t shift = 0x80;
 
 	// output 8 bits during SDA low
-	while (shift) {
+	while (shift)
+	{
 		ft201x_i2c_out_bit(c & shift);
 		shift >>= 1;				// adjust mask
 	}
@@ -134,7 +142,8 @@ int ft201x_i2c_out8bits(uint8_t c) {
 	FT201X_I2C_CLOCK_HIGH;				// put clock high
 
 	// look for slave ack, if not low, then error
-	if (FT201X_I2C_READ_DATA) {
+	if (FT201X_I2C_READ_DATA)
+	{
 		// wait & try again
 		__delay_cycles(20);
 		if (FT201X_I2C_READ_DATA)
@@ -147,7 +156,8 @@ int ft201x_i2c_out8bits(uint8_t c) {
 //*****************************************************************************
 //	Output the stop condition
 //
-inline void ft201x_i2c_out_stop() {
+inline void ft201x_i2c_out_stop()
+{
 	FT201X_I2C_CLOCK_LOW;					// put clock low
 	FT201X_I2C_DATA_LOW;					// make sure SDA is low
 	FT201X_I2C_CLOCK_HIGH;					// clock high
@@ -158,7 +168,8 @@ inline void ft201x_i2c_out_stop() {
 //*****************************************************************************
 //	Output start condition and address
 //
-int ft201x_i2c_start_address(uint8_t address) {
+int ft201x_i2c_start_address(uint8_t address)
+{
 	int error;
 
 	// output start
@@ -166,7 +177,8 @@ int ft201x_i2c_start_address(uint8_t address) {
 	FT201X_I2C_CLOCK_HIGH;			// w/SCL & SDA high
 	FT201X_I2C_DATA_LOW;		// output start (SDA high to low while SCL high)
 
-	if ((error = ft201x_i2c_out8bits(address))) {
+	if ((error = ft201x_i2c_out8bits(address)))
+	{
 		ft201x_i2c_out_stop();		// output stop 1st
 		return error;				//return error
 	}
@@ -176,7 +188,8 @@ int ft201x_i2c_start_address(uint8_t address) {
 //*****************************************************************************
 //	Write entire output io buffer to the FT201X over I2C
 //
-void ft201x_i2c_write() {
+void ft201x_i2c_write()
+{
 	int error;
 	char c;
 
@@ -185,13 +198,16 @@ void ft201x_i2c_write() {
 		longjmp(usb_i2c_context, error);
 
 	// Write entire output io buffer to usb
-	while (usb_buffer->count) {
+	while (usb_buffer->count)
+	{
 		// get character from io buffer
-		if (error = IOgetc(&c, usb_buffer)) {
+		if (error = IOgetc(&c, usb_buffer))
+		{
 			longjmp(usb_i2c_context, error); // return error
 		}
 		// write 8 bits
-		if ((error = ft201x_i2c_out8bits((uint8_t)c))) {
+		if ((error = ft201x_i2c_out8bits((uint8_t) c)))
+		{
 			longjmp(usb_i2c_context, error); //return error
 		}
 	}
@@ -204,7 +220,8 @@ void ft201x_i2c_write() {
 //	read, which can easily be less than the number requested.
 //
 // TODO: do this right
-int ft201x_i2c_read() {
+int ft201x_i2c_read()
+{
 	uint8_t i, data;
 	int16_t error;
 	uint16_t bytes = 1;
@@ -251,30 +268,37 @@ int ft201x_i2c_read() {
 	return 0;
 }
 
-
-
 // Poll the USB input buffer.
-void USBInEvent() {
+void USBInEvent()
+{
 	// Read input characters from computer into io_usb_in
-	if (!(setjmp(usb_i2c_context))) {
+	if (!(setjmp(usb_i2c_context)))
+	{
 		// Read 1 byte until there are no more bytes to be read
 		// io_usb_in will signal the server event if it has data
-		while(!ft201x_i2c_read());
-	} else {
+		while (!ft201x_i2c_read())
+			;
+	}
+	else
+	{
 		// TODO: ERROR
 		return;
 	}
 }
 
 // Write the passed in io buffer to the usb
-int USBOutEvent() {
+int USBOutEvent()
+{
 	int err;
 
 	// set context restore point
-	if (!(err = _setjmp(usb_i2c_context))) {
+	if (!(err = _setjmp(usb_i2c_context)))
+	{
 		// write buffer out to usb
 		ft201x_i2c_write();
-	} else {
+	}
+	else
+	{
 		// Error!
 		// todo: Is there any way to handle this better?
 		return err;

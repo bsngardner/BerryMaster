@@ -72,7 +72,8 @@
 // pin 2.7 (0x80) not on chip
 
 // System errors
-enum SYS_ERRORS {
+enum SYS_ERRORS
+{
 	SYS_ERR_430init = 1,	// 1 initialize
 	SYS_ERR_USCB_RX,		// 2 USCB receive timeout
 	SYS_ERR_I2C_TO,			// 3 i2c timeout
@@ -111,7 +112,8 @@ enum SYS_ERRORS {
  * the device address is also its number
  * if the device address is zero, the device is not configured
  */
-typedef struct Device {
+typedef struct Device
+{
 	uint8_t deviceType;
 	uint8_t deviceAddress;
 } Device_t;
@@ -129,11 +131,12 @@ typedef struct Device {
  * Insertion and deletion are linear time
  * Referencing is constant time
  */
-typedef struct DeviceList {
+typedef struct DeviceList
+{
 	// NOTE: don't access index 0, just access 1-127 and the address is
 	// 		 also the position of the berry in the array
-	Device_t devices[DEVICES_ARRAY_SIZE];
 	uint8_t currNumDevices;
+	Device_t devices[DEVICES_ARRAY_SIZE];
 } DeviceList_t;
 
 /******************************************************************************
@@ -153,14 +156,14 @@ int connectToMaster();
 int disconnectFromMaster();
 
 /* init
+ * project_hash - the hash of the project
  * initializes master:
- * calls hal_init
+ * calls hal_initDevices
  * validates current list of berries by pinging each one
  * discovers new devices and assigns them addresses
- * 	 iterates hal_discover(newDevAddr)
- * @return 0 for success.
+ * 	 iterates hal_getNewDevice(newDevAddr)
  */
-int initDevices();
+int initDevices(uint8_t project_hash);
 
 /* getDeviceType
  * @param the address of the device

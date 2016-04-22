@@ -9,7 +9,8 @@
 #include "IObuffer.h"
 
 // Write one character to the buffer
-int IOputc(char c, IObuffer* iob) {
+int IOputc(char c, IObuffer* iob)
+{
 	int head_dex; // This might be cached for more speed...
 
 	// Return error if buffer is null or inactive or full
@@ -39,7 +40,8 @@ int IOputc(char c, IObuffer* iob) {
 }
 
 // Write a C string to the buffer (null terminated!)
-int IOputs(const char* s, IObuffer* iob) {
+int IOputs(const char* s, IObuffer* iob)
+{
 	//Counts bytes until null, calls nputs
 	const char* ptr = s;
 	int n = 0;
@@ -49,7 +51,8 @@ int IOputs(const char* s, IObuffer* iob) {
 }
 
 //Unfinished, not declared in .h
-int IOnputs(const char* src, int n, IObuffer* iob) {
+int IOnputs(const char* src, int n, IObuffer* iob)
+{
 	int space_left;		// bytes left to EITHER end of buffer or overflow
 	char* write_ptr;		// pointer to which to copy
 
@@ -71,7 +74,8 @@ int IOnputs(const char* src, int n, IObuffer* iob) {
 
 	//If there is more space than n, skip first loop and write
 	//	n bytes straight through
-	if (space_left < n) {
+	if (space_left < n)
+	{
 		n -= space_left;
 		while (space_left-- > 0)
 			*write_ptr++ = *src++;
@@ -84,7 +88,8 @@ int IOnputs(const char* src, int n, IObuffer* iob) {
 }
 
 //Unfinished, not declared in .h
-int IOnputs_mem(const char* src, int n, IObuffer* iob) {
+int IOnputs_mem(const char* src, int n, IObuffer* iob)
+{
 	int space_left;		// bytes left to EITHER end of buffer or overflow
 	char* write_ptr;		// pointer to which to copy
 
@@ -106,7 +111,8 @@ int IOnputs_mem(const char* src, int n, IObuffer* iob) {
 
 	//If there is more space than n, skip first loop and write
 	//	n bytes straight through
-	if (space_left < n) {
+	if (space_left < n)
+	{
 		memcpy(write_ptr, src, space_left);
 		n -= space_left;
 		src += space_left;
@@ -118,7 +124,8 @@ int IOnputs_mem(const char* src, int n, IObuffer* iob) {
 }
 
 // Get a character out of the buffer
-int IOgetc(char* cp, IObuffer *iob) {
+int IOgetc(char* cp, IObuffer *iob)
+{
 	// Return error if buffer is null or inactive or empty or if cp is null
 	if (!iob || !iob->size || !iob->count || !cp)
 		return -1; // error
@@ -135,7 +142,8 @@ int IOgetc(char* cp, IObuffer *iob) {
 	return 0;
 }
 
-IObuffer* IObuffer_create(int size) {
+IObuffer* IObuffer_create(int size)
+{
 	// Minimum size of 1
 	if (size <= 0)
 		return 0;
@@ -159,7 +167,8 @@ IObuffer* IObuffer_create(int size) {
 	return iob;
 }
 
-void IObuffer_init(IObuffer* iob, char* buffer, int size, void (*cb)(void)) {
+void IObuffer_init(IObuffer* iob, char* buffer, int size, void (*cb)(void))
+{
 	iob->buffer = buffer;
 	iob->tail_dex = 0;
 	iob->count = 0;
@@ -167,9 +176,12 @@ void IObuffer_init(IObuffer* iob, char* buffer, int size, void (*cb)(void)) {
 	iob->bytes_ready = cb;
 }
 
-void IObuffer_destroy(IObuffer* iob) {
-	if (iob) {
-		if (iob->buffer) {
+void IObuffer_destroy(IObuffer* iob)
+{
+	if (iob)
+	{
+		if (iob->buffer)
+		{
 			free(iob->buffer);
 			iob->buffer = NULL;
 		}

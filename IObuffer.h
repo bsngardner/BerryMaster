@@ -8,7 +8,8 @@
 #ifndef IOBUFFER_H_
 #define IOBUFFER_H_
 
-typedef struct {
+typedef struct
+{
 	char* buffer;				// pointer to actual buffer in memory
 	int size;					// maximum capacity -- size of buffer
 	int tail_dex;				// index of oldest data = index to read from

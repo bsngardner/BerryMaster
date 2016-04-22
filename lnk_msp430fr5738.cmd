@@ -132,6 +132,7 @@ SECTIONS
        GROUP(READ_WRITE_MEMORY)
        {
           .TI.persistent : {}                /* For #pragma persistent            */
+          .TI.noinit  : {}                   /* For #pragma noinit                */
           .cio        : {}                   /* C I/O buffer                      */
           .sysmem     : {}                   /* Dynamic memory allocation area    */
        } ALIGN(0x0200), RUN_START(fram_rw_start)
@@ -158,7 +159,7 @@ SECTIONS
 
     .bss        : {} > RAM                /* Global & static vars              */
     .data       : {} > RAM                /* Global & static vars              */
-    .TI.noinit  : {} > RAM                /* For #pragma noinit                */
+//    .TI.noinit  : {} > FRAM                /* For #pragma noinit                */
     .stack      : {} > RAM (HIGH)         /* Software system stack             */
 
     .infoA     : {} > INFOA              /* MSP430 INFO FRAM  Memory segments */
@@ -220,7 +221,7 @@ SECTIONS
     COMP_D       : { * ( .int52 ) } > INT52 type = VECT_INIT
     UNMI         : { * ( .int53 ) } > INT53 type = VECT_INIT
     SYSNMI       : { * ( .int54 ) } > INT54 type = VECT_INIT
-    .reset       : {}               > RESET  /* MSP430 Reset vector         */ 
+    .reset       : {}               > RESET  /* MSP430 Reset vector         */
 }
 
 /****************************************************************************/

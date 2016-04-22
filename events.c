@@ -34,7 +34,8 @@ void events_usbCallback();
 void events_serverCallback();
 
 //Init all buffer and slot connections
-void events_init() {
+void events_init()
+{
 	server_init();
 	server_slot = usb_buffer;
 	usb_slot = server_buffer;
@@ -43,25 +44,32 @@ void events_init() {
 	server_buffer->bytes_ready = events_serverCallback;
 }
 
-void eventsLoop() {
+void eventsLoop()
+{
 	int numEventErrors = 0;
 
 	// Wait for an interrupt
-	while (1) {
+	while (1)
+	{
 		// Are there events available?
 		__disable_interrupt();
-		if (!sys_event) {
+		if (!sys_event)
+		{
 			// no events pending, enable interrupts and goto sleep (LPM0)
 			__bis_SR_register(LPM0_bits | GIE);
 			continue;
-		} else {
+		}
+		else
+		{
 			// At least 1 event is pending
 			__enable_interrupt();
 
 			// Output is ready to be sent to the host:
-			if (sys_event & USB_O_EVENT) {
+			if (sys_event & USB_O_EVENT)
+			{
 				sys_event &= ~USB_O_EVENT;
-				if (USBOutEvent()) {
+				if (USBOutEvent())
+				{
 					// We're not finished, queue up this event again.
 					sys_event |= USB_O_EVENT;
 				}
@@ -69,25 +77,29 @@ void eventsLoop() {
 			}
 
 			// Input is available from the host:
-			else if (sys_event & USB_I_EVENT) {
+			else if (sys_event & USB_I_EVENT)
+			{
 				sys_event &= ~USB_I_EVENT;
 				USBInEvent();
 			}
 
 			// Ready to servic a pending request from the host:
-			else if (sys_event & SERVER_EVENT) {
+			else if (sys_event & SERVER_EVENT)
+			{
 				sys_event &= ~SERVER_EVENT;
 				serverEvent();
 			}
 
 			// Ready to servic a pending request from the host:
-			else if (sys_event & HEARTBEAT_EVENT) {
+			else if (sys_event & HEARTBEAT_EVENT)
+			{
 				sys_event &= ~HEARTBEAT_EVENT;
 				LED0_OFF;
 			}
 
 			// Error - Unrecognized event.
-			else {
+			else
+			{
 				// TODO: do this right.
 				//reportError("UnrecognizedEvent", SYS_ERR_EVENT, io_usb_out);
 
@@ -98,7 +110,8 @@ void eventsLoop() {
 				// If the number of event errors reaches a predefined value,
 				// stop the program
 				numEventErrors++;
-				if (numEventErrors >= MAX_EVENT_ERRORS) {
+				if (numEventErrors >= MAX_EVENT_ERRORS)
+				{
 					handleError();
 				}
 			}
@@ -106,17 +119,20 @@ void eventsLoop() {
 	}
 }
 
-void events_usbCallback() {
+void events_usbCallback()
+{
 	sys_event |= USB_O_EVENT;
 }
 
-void events_serverCallback() {
+void events_serverCallback()
+{
 	sys_event |= SERVER_EVENT;
 	LED1_ON;
 }
 
 // Reports an error to the user
-void reportError(char* msg, int err, IObuffer* buff) {
+void reportError(char* msg, int err, IObuffer* buff)
+{
 	int byteCount;
 	//buff = io_usb_out;
 	// Fill up the buffer - it's easier for us to fill up the buffer all the
@@ -130,7 +146,8 @@ void reportError(char* msg, int err, IObuffer* buff) {
 	// put the message in - count how many bytes that is
 	byteCount = IOputs(msg, buff);
 	// is there space left in the buffer
-	if (byteCount > 0) {
+	if (byteCount > 0)
+	{
 		// yes, fill up the remaining space with nulls
 		while (IOputc(0, buff) == SUCCESS)
 			;
@@ -142,7 +159,8 @@ void reportError(char* msg, int err, IObuffer* buff) {
 }
 
 // Initialize the Watchdog Timer
-int WDT_init() {
+int WDT_init()
+{
 	WDTCTL = WDT_CTL; // Set Watchdog interval
 	SFRIE1 |= WDTIE; // Enable WDT interrupt
 
@@ -155,30 +173,35 @@ int WDT_init() {
 //	Watchdog Timer ISR
 //
 #pragma vector = WDT_VECTOR
-__interrupt void WDT_ISR(void) {
+__interrupt void WDT_ISR(void)
+{
 
 	// One second elapsed
 	--WDT_cps_cnt;
 	if (WDT_cps_cnt == WDT_CLKS_PER_SEC / 4)
 		LED0_ON; // toggle heartbeat LED
-	if (WDT_cps_cnt == 0) {
+	if (WDT_cps_cnt == 0)
+	{
 		WDT_cps_cnt = WDT_CLKS_PER_SEC;
 		sys_event |= HEARTBEAT_EVENT;
 	}
 
 	// Should we poll the USB?
 	--usb_poll_cnt;
-	if (usb_poll_cnt == 0) {
+	if (usb_poll_cnt == 0)
+	{
 		sys_event |= USB_I_EVENT; // poll the usb chip (ft201x)
 		usb_poll_cnt = USB_POLL_CNT; // 1/16 sec
 		__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
 	}
 
 	// Are we currently debouncing the switch?
-	if (debounceCnt) {
+	if (debounceCnt)
+	{
 		// Yes; are we finished?
 		--debounceCnt;
-		if (debounceCnt == 0) {
+		if (debounceCnt == 0)
+		{
 			// Toggle LED1. At a later time, we may want
 			// to signal some kind of button event.
 			LED1_TOGGLE;
@@ -190,9 +213,11 @@ __interrupt void WDT_ISR(void) {
 //	Port 1 ISR
 //
 #pragma vector=PORT1_VECTOR
-__interrupt void Port_1_ISR(void) {
+__interrupt void Port_1_ISR(void)
+{
 	// USB interrupt?
-	if (P1IFG & USBINT) {
+	if (P1IFG & USBINT)
+	{
 		// Clear the pending interrupt.
 		P1IFG &= ~USBINT;
 
@@ -204,7 +229,8 @@ __interrupt void Port_1_ISR(void) {
 	}
 
 	// Switch1 interrupt?
-	if (P1IFG & SW1) {
+	if (P1IFG & SW1)
+	{
 		debounceCnt = DEBOUNCE_CNT; // set debounce count
 		P1IFG &= ~SW1; // clear interrupt flag
 	}
