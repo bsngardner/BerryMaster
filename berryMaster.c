@@ -311,6 +311,11 @@ static int validateDeviceList()
 	volatile int asdf = 0;
 	asdf++;
 
+	// First, send a general call to the berries to make sure they have
+	// the same project hash
+	// todo: call hal_check_proj_hash(project_hash);
+
+	// Second, iterate through the device table and ping each device
 	// i keeps track of how many devices we've checked
 	// addr iterates through the device array
 	// exit the loop when
