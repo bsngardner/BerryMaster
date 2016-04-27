@@ -26,7 +26,7 @@
 #define USB_POLL_CNT		25
 #define NRF_PING_MAX		8
 #define NRF_PING_MIN		1
-#define TEST_COUNT			50
+#define TEST_COUNT			100
 #define MAX_EVENT_ERRORS	10
 
 // Global variables
@@ -49,14 +49,18 @@ void events_testRX();
 IObuffer* test_slot;
 IObuffer* test_buffer;
 
-#define PRX 1
+#define PRX 0
 
 //Init all buffer and slot connections
 void events_init()
 {
 	nrf_init(120, 2);
 	nrf_open(PRX);
+#if PRX==0
 	test_cnt = 0;
+#else
+	test_cnt = 0;
+#endif
 	//server_init();
 
 	nrf_slot = usb_buffer;
@@ -99,7 +103,6 @@ void eventsLoop()
 				// We're not finished, queue up this event again.
 				sys_event |= USB_O_EVENT;
 			}
-			LED0_OFF;
 		}
 
 		// Input is available from the host:
@@ -108,6 +111,20 @@ void eventsLoop()
 			sys_event &= ~USB_I_EVENT;
 			if (ft201x_powered())
 				USBInEvent();
+		}
+
+		// Ready to servic a pending request from the host:
+		else if (sys_event & SERVER_EVENT)
+		{
+			sys_event &= ~SERVER_EVENT;
+			serverEvent();
+		}
+
+		//event for testing regular stuff
+		else if (sys_event & TEST_EVENT)
+		{
+			sys_event &= ~TEST_EVENT;
+			events_test();
 		}
 
 		//Radio data ready to send
@@ -121,24 +138,10 @@ void eventsLoop()
 			}
 		}
 
-		// Ready to servic a pending request from the host:
-		else if (sys_event & SERVER_EVENT)
-		{
-			sys_event &= ~SERVER_EVENT;
-			serverEvent();
-		}
-
 		else if (sys_event & NRF_PING_EVENT)
 		{
 			sys_event &= ~NRF_PING_EVENT;
 			nrf_sendPing();
-		}
-
-		//event for testing regular stuff
-		else if (sys_event & TEST_EVENT)
-		{
-			sys_event &= ~TEST_EVENT;
-			events_test();
 		}
 
 		// Ready to servic a pending request from the host:
@@ -171,7 +174,9 @@ void eventsLoop()
 
 void events_test()
 {
-
+	static count = 0;
+	iofprintf(nrf_buffer, "%d", ++count);
+	LED0_OFF;
 }
 
 void events_usbCallback()
@@ -255,6 +260,7 @@ __interrupt void WDT_ISR(void)
 
 	if (test_cnt && !(--test_cnt))
 	{
+		LED0_ON;
 		test_cnt = TEST_COUNT;
 		sys_event |= TEST_EVENT;
 	}
@@ -311,14 +317,12 @@ enum
 #pragma vector=PORT1_VECTOR
 __interrupt void Port_1_ISR(void)
 {
-
 	switch (__even_in_range(P1IV, 0x10))
 	{
 	case NONE:
 		break;
 	case IV1_0: 	//INT
 		spi_int();
-		P1IFG &= ~INT0;
 		break;
 	case IV1_3: //SW1
 		debounceCnt = DEBOUNCE_CNT;
@@ -332,5 +336,4 @@ __interrupt void Port_1_ISR(void)
 //		}
 		break;
 	}
-
 }

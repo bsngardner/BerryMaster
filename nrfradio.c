@@ -222,7 +222,7 @@ int nrf_sendPacket()
 
 void nrf_sendPing()
 {
-	if (sem_fifo!=3 || nrf_prx)
+	if (sem_fifo != 3 || nrf_prx)
 		return;
 	INT_DIS;	//Disable INT interrupt
 	while (spi_reading)
@@ -576,7 +576,7 @@ extern volatile unsigned char TXData;
 
 //Interrupt functions
 
-enum
+volatile enum
 {
 	IDLE = 0x00,
 	INIT = 0x02,
@@ -704,8 +704,19 @@ inline void nrf_rx_handle()
 //Read the first byte, ignore if 0, pass to buffer if non zero
 	case READ_FIRST:
 		rx_state = READ;
-		if (!RXData)
-			break;
+		if (RXData)
+			IOputc(RXData, nrf_slot);
+
+		if (!(--rx_count))
+		{
+			CSN_DIS;
+			rx_state = CLEAR_IRQ;
+			irq_clear = RF24_IRQ_RX;
+			TXData = (RF24_STATUS | RF24_W_REGISTER);
+			CSN_EN;
+		}
+		START_SPI;
+		break;
 
 //Main reading state, read rx_count bytes
 	case READ:
