@@ -202,16 +202,6 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
  */
 int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg);
 
-/* clearNetwork
- * clears all info about devices in the network
- */
-void clearNetwork();
-
-/* printNetworkInfo
- * prints all the info about all configured devices on the network
- * (all other addresses are not configured)
- */
-
 /******************************************************************************
  * Other function prototypes **************************************************
  *****************************************************************************/

@@ -12,21 +12,10 @@
  variables ********************************************************************
  *****************************************************************************/
 #pragma PERSISTENT(myDeviceList)
-DeviceList_t myDeviceList =
-{
-		0, // currNumDevices
-		// device table
-		0, 0,
-		0, 0,
-		0, 0,
-		0, 0,
-		0, 0,
-		0, 0,
-		0, 0
-};
+DeviceList_t myDeviceList = { 0 };
 
-#pragma PERSISTENT(stored_project_hash)
-uint8_t stored_project_hash = 0;
+#pragma PERSISTENT(fram_proj_hash)
+uint8_t fram_proj_hash = 0;
 
 /******************************************************************************
  function prototypes and macros ***********************************************
@@ -37,6 +26,11 @@ uint8_t stored_project_hash = 0;
  * @return 1 if a device is configured at the address; 0 otherwise
  */
 #define addrIsUsed(addr) (myDeviceList.devices[addr].deviceAddress > 0)
+
+/* clearNetwork
+ * resets device table and all connected devices
+ */
+static void clearNetwork();
 
 /* validateDeviceList
  *  pings each device in the list
@@ -105,21 +99,16 @@ int initDevices(uint8_t project_hash)
 	if (error = hal_init())
 		return error;
 
-	// If project hash is different, clear the device network and reset all
-	// devices. Update the project hash.
-	if (project_hash != stored_project_hash)
+	// If project hash is different, clear the device network and
+	// update the project hash.
+	if (project_hash != fram_proj_hash)
 	{
 		clearNetwork();
-		if (error = hal_resetAllDevices())
-			return error;
-		stored_project_hash = project_hash;
+		fram_proj_hash = project_hash;
 	}
-	// If it is the same, validate the device list we have.
-	else
-	{
-		if (error = validateDeviceList())
-			return error;
-	}
+	// Validate the device list we have.
+	if (error = validateDeviceList())
+		return error;
 	// Look for new devices on the network.
 	if (error = getNewDevices())
 		return error;
@@ -275,13 +264,14 @@ int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg)
 }
 
 /******************************************************************************
- possible API functions *******************************************************
+ internal functions ***********************************************************
  *****************************************************************************/
 
 /* clearNetwork
- * reset the device table
+ * resets the device table
+ * resets all devices
  */
-void clearNetwork()
+static void clearNetwork()
 {
 	int i;
 	for (i = 0; i < DEVICES_ARRAY_SIZE; i++)
@@ -290,11 +280,9 @@ void clearNetwork()
 		myDeviceList.devices[i].deviceType = UNKNOWN;
 	}
 	myDeviceList.currNumDevices = 0;
-}
 
-/******************************************************************************
- internal functions ***********************************************************
- *****************************************************************************/
+//	hal_resetAllDevices();
+}
 
 /* validateDeviceList
  * iterates through the list of devices
@@ -308,12 +296,10 @@ static int validateDeviceList()
 	int error;
 	int addr = 1;
 	int tempNumDevices = myDeviceList.currNumDevices;
-	volatile int asdf = 0;
-	asdf++;
 
 	// First, send a general call to the berries to make sure they have
 	// the same project hash
-	// todo: call hal_check_proj_hash(project_hash);
+	hal_check_proj_hash(fram_proj_hash);
 
 	// Second, iterate through the device table and ping each device
 	// i keeps track of how many devices we've checked
@@ -338,7 +324,6 @@ static int validateDeviceList()
 				myDeviceList.devices[addr].deviceType = UNKNOWN;
 				// one less device on the network
 				myDeviceList.currNumDevices--;
-				return error;
 			}
 		}
 		addr++;

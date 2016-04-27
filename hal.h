@@ -14,6 +14,7 @@
 #define ADDR_ACCEPTED 0
 #define ADDR_REJECTED 2
 #define NO_RESPONSE	1
+#define ERROR 6
 #define PING 0
 #define SUCCESS 0
 
@@ -29,6 +30,8 @@ extern uint8_t hal_resetAllDevices();
 
 //Return 0 on ping success, 1 on ping failure
 extern uint8_t hal_pingDevice(uint8_t address);
+
+extern uint8_t hal_check_proj_hash(uint8_t proj_hash);
 
 //Sets register (reg) on device (@address) to value (value)
 extern uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg,

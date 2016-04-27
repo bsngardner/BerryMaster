@@ -30,7 +30,9 @@ volatile static I2C_STATUS status = STOP;
 
 //Defines
 //Commands
-#define NEW_ADDR_CMD 0x00
+#define NEW_ADDR_CMD 0
+#define RESET_ALL_CMD 1
+#define PROJ_HASH_CMD 2
 
 #define CLOCK_SPEED 24000000
 #define I2C_SPEED 1000000
@@ -75,7 +77,7 @@ uint8_t hal_discoverNewDevice(uint8_t new_address)
 
 	UCB0I2CSA = GEN_CALL;
 	txPtr = txData;
-	txPtr[0] = 0x00;
+	txPtr[0] = NEW_ADDR_CMD;
 	txPtr[1] = new_address;
 	configure_i2c(2);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
@@ -102,7 +104,7 @@ uint8_t hal_resetAllDevices()
 {
 	UCB0I2CSA = GEN_CALL;
 	txPtr = txData;
-	txPtr[0] = 0x01;
+	txPtr[0] = RESET_ALL_CMD;
 
 	configure_i2c(1);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
@@ -122,7 +124,7 @@ uint8_t hal_resetAllDevices()
 	{
 		return ADDR_REJECTED;
 	}
-	return 0;
+	return ERROR;
 }
 
 // Sends 0x01 to device address, returns 0 if device ACKed, 1 if NACK
@@ -151,9 +153,36 @@ uint8_t hal_pingDevice(uint8_t address)
 	}
 	__no_operation();
 	//oh no
-	return 1;
+	return 2;
 
 } //End hal_pingDevice
+
+uint8_t hal_check_proj_hash(uint8_t proj_hash)
+{
+	UCB0I2CSA = GEN_CALL;
+	txPtr = txData;
+	txPtr[0] = PROJ_HASH_CMD;
+	txPtr[1] = proj_hash;
+	configure_i2c(2);
+	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
+
+	vineSleep = 1;
+	status = DATA;
+	UCB0CTLW0 |= UCTXSTT;
+
+	while (vineSleep)
+		LPM0;
+
+	if (status == STOP)
+	{
+		return 1;
+	}
+	if (status == NACK)
+	{
+		return 2;
+	}
+	return ERROR;
+}
 
 //Sets register (reg) on device (@address) to value (value)
 uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg, uint8_t value)
