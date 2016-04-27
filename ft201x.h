@@ -16,6 +16,7 @@ void ft201x_i2c_write();
 int ft201x_i2c_read();
 int ft201x_flushBuffers();
 void ft201x_setUSBCallback(void (*callback)(void));
+uint8_t ft201x_powered();
 void USBInEvent();
 int USBOutEvent();
 

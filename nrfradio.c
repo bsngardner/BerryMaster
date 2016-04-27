@@ -30,20 +30,33 @@ volatile uint8_t rf_irq;
 IObuffer* nrf_slot = 0;
 IObuffer* nrf_buffer = 0;
 
-static const uint8_t pipe_addr[6][5] = { { 0xDE, 0xAD, 0xBE, 0xEF, 0x00 }, {
-		0xFA, 0xDE, 0xDA, 0xCE, 0x51 }, { 0xFA, 0xDE, 0xDA, 0xCE, 0x52 }, {
-		0xFA, 0xDE, 0xDA, 0xCE, 0x53 }, { 0xFA, 0xDE, 0xDA, 0xCE, 0x54 }, {
-		0xFA, 0xDE, 0xDA, 0xCE, 0x55 } };
+static const uint8_t pipe_addr[6][5] =
+{
+{ 0xDE, 0xAD, 0xBE, 0xEF, 0x00 },
+{ 0xFA, 0xDE, 0xDA, 0xCE, 0x51 },
+{ 0xFA, 0xDE, 0xDA, 0xCE, 0x52 },
+{ 0xFA, 0xDE, 0xDA, 0xCE, 0x53 },
+{ 0xFA, 0xDE, 0xDA, 0xCE, 0x54 },
+{ 0xFA, 0xDE, 0xDA, 0xCE, 0x55 } };
+
+static uint8_t nrf_prx = 0;
+volatile uint16_t sem_fifo = 3;
+volatile int tx_failed = 0;
+
+void (*nrf_txCallback)();
+void (*nrf_txFailCallback)();
 
 // Initialize radio, pass NULL for default values:
 // frequency=		speed=
-int nrf_init(int freq, int speed) {
+int nrf_init(int freq, int speed)
+{
 	spi_init();
 	// Need this input buffer to read data from host.
 	if (!(nrf_buffer = IObuffer_create(NRF_BUF_SIZE)))
 		return -1;
 
-	const uint8_t speeds[3] = { RF24_SPEED_250KBPS, RF24_SPEED_1MBPS,
+	const uint8_t speeds[3] =
+	{ RF24_SPEED_250KBPS, RF24_SPEED_1MBPS,
 	RF24_SPEED_2MBPS };
 
 	if (freq)
@@ -64,7 +77,7 @@ int nrf_init(int freq, int speed) {
 	//port_init();
 	P2DIR |= (RFCS | RFCE);
 	// Wait 100ms for RF transceiver to initialize.
-	__delay_cycles(DELAY_CYCLES_130US);
+	__delay_cycles(DELAY_CYCLES_100MS);
 
 	msprf24_powerdown();
 
@@ -73,11 +86,7 @@ int nrf_init(int freq, int speed) {
 	 * clears the DYNPD register.
 	 */
 	msprf24_irq_clear(RF24_IRQ_MASK);  // Forget any outstanding IRQs
-#if 1
 	msprf24_set_retransmit_delay(800);  // A default I chose
-#else
-			msprf24_set_retransmit_delay(800);  // A default I chose
-#endif
 	msprf24_set_retransmit_count(6);    // A default I chose
 	msprf24_set_speed_power();
 	msprf24_set_channel();
@@ -87,7 +96,7 @@ int nrf_init(int freq, int speed) {
 	//msprf24_enable_feature(RF24_EN_DYN_ACK); // Ability to use w_tx_payload_noack()  //----////somehow getting rid of this line fixes everything...!?!?!????
 
 	// the following line enables ack payloads
-	//msprf24_enable_feature(RF24_EN_ACK_PAY);
+	msprf24_enable_feature(RF24_EN_ACK_PAY);
 
 	flush_tx();
 	flush_rx();
@@ -96,17 +105,10 @@ int nrf_init(int freq, int speed) {
 
 }
 
-void nrf_setTXCallback(void (*callback)(void)) {
-	nrf_buffer->bytes_ready = callback;
-}
-
-int nrf_TXEvent() {
-	return nrf_sendBytes();
-}
-
 #define PIPE 0
 // ... open given pipe
-int nrf_open() {
+int nrf_open(uint8_t is_prx)
+{
 	msprf24_standby();
 	msprf24_set_pipe_packetsize(PIPE, 0); //Pipe 0
 
@@ -127,15 +129,20 @@ int nrf_open() {
 	write_rx_address(0, pipe_addr[0]);
 
 	w_reg(RF24_STATUS, RF24_RX_DR);
-	msprf24_set_config(RF24_PWR_UP | RF24_PRIM_RX);
-	CE_EN;
-	INT_EN;
-	return 1;
-
+	nrf_prx = is_prx;
+	if (nrf_prx)
+	{
+		//If PRX device, set to receive mode and enable interrupt
+		msprf24_set_config(RF24_PWR_UP | RF24_PRIM_RX);
+		CE_EN;
+		INT_EN;
+	}
+	return 0;
 }
 
 // close given pipe
-void nrf_close() {
+void nrf_close()
+{
 	uint8_t rxen, enaa;
 
 //	if (pipe > 5)
@@ -157,115 +164,110 @@ void nrf_close() {
 #define RAND_2 (~(2^13))
 #define MAX_RETRIES 5
 
-int nrf_sendBytes() {
-	IObuffer* txData = nrf_buffer;
-	int result = 0;
+#define FIFO_FULL -1
+
+int nrf_sendPacket()
+{
+	if (!sem_fifo)
+		return FIFO_FULL;
 
 	INT_DIS;	//Disable INT interrupt
 	while (spi_reading)
 		;	//Wait until any RX is done
-	msprf24_standby();		//Leave receive mode, ready for transmit mode
 
-	uint16_t byteCount = txData->count; //Record the number of bytes to send
-	uint8_t count; //Holds the number of bytes for each packet
-	char data; //Temp variable for reading data from IObuffer
+	uint8_t count = nrf_buffer->count; //Holds the number of bytes in packet
+	if (count > PAYLOAD_SIZE)
+	{
+		//Send 32 bytes of data if > 32
+		count = PAYLOAD_SIZE;
+	}
 
-	flush_tx();		//FLush tx for a clean slate
-	w_reg(RF24_STATUS, RF24_TX_DS | RF24_MAX_RT);//Clear pending TX interrupts
-
-	while (byteCount) {
-		if (byteCount > PAYLOAD_SIZE) {
-			//Send 32 bytes of data if > 32
-			count = PAYLOAD_SIZE;
-			byteCount -= PAYLOAD_SIZE;
-		} else {
-			count = byteCount; //If less than 32, just send that many
-			byteCount = 0;
-		}
-
-		CSN_EN; //Start radio command
+	CSN_EN; //Start radio command
+	if (nrf_prx) //If primery receive radio,
+		//Load packet as ack payload
+		rf_status = spi_transfer(RF24_W_ACK_PAYLOAD);
+	else
+		//if primary transmit, load packet as normal
 		rf_status = spi_transfer(RF24_W_TX_PAYLOAD); //CMD to send TX payload
-		while (count-- > 0) { //Loop to send data to radio over SPI
-			IOgetc(&data, txData);
-			spi_transfer(data);
-		}
-		CSN_DIS; //End radio command
+	char data; //Temp variable for reading data from IObuffer
+	//This may look confusing, but we injext another 0 into the packet if the
+	//	first byte is 0 because the first byte will be ignored if it is 0;
+	IOgetc(&data, nrf_buffer);
+	count--;
+	spi_transfer(data);
+	if (!data)
+	{
+		if (count)
+			count--;
+		spi_transfer(0);
+	}
+	while (count-- > 0)
+	{ //Loop to send data to radio over SPI
+		IOgetc(&data, nrf_buffer);
+		spi_transfer(data);
+	}
+	CSN_DIS; //End radio command
 
-		pulse_ce(); //Signal to send data over radio
-		int try_count = 0; //Count tries until assumed disconnect
-		while (1) {
-			msprf24_get_irq_reason(); //Get reason: fail or success
-			if (rf_irq & RF24_IRQ_TX) { //Success
-				msprf24_irq_clear(RF24_IRQ_TX); //Clear interrupt source
-				break;
-			} else if (rf_irq & RF24_IRQ_TXFAILED) { //Fail
-				msprf24_irq_clear(RF24_IRQ_TXFAILED); //Clear interrupt source
-				if (1){//try_count < MAX_RETRIES) { //Try MAX_RETRIES time
-					try_count++;
-					msprf24_set_config(RF24_PWR_UP | RF24_PRIM_RX); //Receive mode
-					CE_EN; //Activate
-					INT_EN; //Reenable interrupt so RX can function
+	--sem_fifo; //Decrement fifo semafore
+	INT_EN; //Reenable interrupt for IRQs
 
-					unsigned int r1 = (rand() & (RAND_1));
-					unsigned int r2 = (rand() & (RAND_2));
-					unsigned int i = r1 + r2 + MIN_RAND;
-					while (i-- > 0) {
-						//Wait random period
-
-					}
-
-					INT_DIS;	//Disable INT interrupt
-					while (spi_reading)
-						;	//Wait until any RX is done
-					msprf24_standby();//Leave receive mode, ready for transmit mode
-
-					tx_reuse_lastpayload(); //Command to resend last packet
-				} else {
-					flush_tx(); //Give up
-					result = -1;
-					goto return_l;
-				}
-			}
-		}
-
-	}		//End send loop
-	return_l:
-
-	msprf24_set_config(RF24_PWR_UP | RF24_PRIM_RX); //Receive mode
-	CE_EN; //Activate
-	INT_EN; //Enable radio interrupt
-	return result;
+	//If transmitter and fifo has at least 1 packet,
+	//	raise CE (or keep raised) to send packets
+	//CE will be lowered when a success interrupt is received
+	//	and fifo is empty
+	if (!nrf_prx && sem_fifo < 3)
+		CE_EN;
+	return sem_fifo;
 }
 
-#if 0
-void recieve_mode() {
-	msprf24_standby();
-	w_reg(RF24_STATUS, RF24_RX_DR);
+void nrf_sendPing()
+{
+	if (sem_fifo!=3 || nrf_prx)
+		return;
+	INT_DIS;	//Disable INT interrupt
+	while (spi_reading)
+		;	//Wait until any RX is done
 
-// Enable PRIM_RX
-	msprf24_set_config(RF24_PWR_UP | RF24_PRIM_RX);
-	CE_EN;
+	CSN_EN; //Start radio command
+	rf_status = spi_transfer(RF24_W_TX_PAYLOAD); //CMD to send TX payload
+
+	spi_transfer(0);
+	CSN_DIS; //End radio command
+	--sem_fifo; //Decrement fifo semafore
+	INT_EN; //Reenable interrupt for IRQs
+
+	//If transmitter and fifo has at least 1 packet,
+	//	raise CE (or keep raised) to send packets
+	//CE will be lowered when a success interrupt is received
+	//	and fifo is empty
+	if (!nrf_prx && sem_fifo < 3)
+		CE_EN;
 }
-#endif
 
-void msprf24_close_pipe_all() {
+void msprf24_close_pipe_all()
+{
 	w_reg(RF24_EN_RXADDR, 0x00);
 	w_reg(RF24_EN_AA, 0x00);
 	w_reg(RF24_DYNPD, 0x00);
 }
 
 // Set the rx pipe address, sending to the radio
-void write_rx_address(uint8_t pipe, const uint8_t *addr) {
+void write_rx_address(uint8_t pipe, const uint8_t *addr)
+{
 	int i;
 
 	if (pipe > 5)
 		return;  // Only 6 pipes available
 	CSN_EN;
 	rf_status = spi_transfer((RF24_RX_ADDR_P0 + pipe) | RF24_W_REGISTER);
-	if (pipe > 1) {  // Pipes 2-5 differ from pipe1's addr only in the LSB.
+	if (pipe > 1)
+	{  // Pipes 2-5 differ from pipe1's addr only in the LSB.
 		spi_transfer(addr[rf_addr_width - 1]);
-	} else {
-		for (i = rf_addr_width - 1; i >= 0; i--) {
+	}
+	else
+	{
+		for (i = rf_addr_width - 1; i >= 0; i--)
+		{
 			spi_transfer(addr[i]);
 		}
 	}
@@ -273,19 +275,22 @@ void write_rx_address(uint8_t pipe, const uint8_t *addr) {
 }
 
 // Set the tx pipe address, used to burst send
-void write_tx_address(const uint8_t *addr) {
+void write_tx_address(const uint8_t *addr)
+{
 	int i;
 
 	CSN_EN;
 	rf_status = spi_transfer(RF24_TX_ADDR | RF24_W_REGISTER);
-	for (i = rf_addr_width - 1; i >= 0; i--) {
+	for (i = rf_addr_width - 1; i >= 0; i--)
+	{
 		spi_transfer(addr[i]);
 	}
 	CSN_DIS;
 }
 
 /* Clear IRQ flags */
-void msprf24_irq_clear(uint8_t irqflag) {
+void msprf24_irq_clear(uint8_t irqflag)
+{
 	uint8_t fifostat;
 
 	rf_irq = 0x00; // Clear IRQs; afterward analyze RX FIFO to see if we should re-set RX IRQ flag.
@@ -295,7 +300,8 @@ void msprf24_irq_clear(uint8_t irqflag) {
 	CSN_DIS;
 
 // Per datasheet procedure, check FIFO_STATUS to see if there's more RX FIFO data to process.
-	if (irqflag & RF24_IRQ_RX) {
+	if (irqflag & RF24_IRQ_RX)
+	{
 		CSN_EN;
 		rf_status = spi_transfer(RF24_FIFO_STATUS | RF24_R_REGISTER);
 		fifostat = spi_transfer(RF24_NOP);
@@ -306,7 +312,8 @@ void msprf24_irq_clear(uint8_t irqflag) {
 }
 
 // Get IRQ flag status
-uint8_t msprf24_get_irq_reason() {
+uint8_t msprf24_get_irq_reason()
+{
 	uint8_t rf_irq_old = rf_irq;
 
 //rf_irq &= ~RF24_IRQ_FLAGGED;  -- Removing in lieu of having this check determined at irq_clear() time
@@ -320,25 +327,31 @@ uint8_t msprf24_get_irq_reason() {
 /* Evaluate state of TX, RX FIFOs
  * Compare this with RF24_QUEUE_* #define's from msprf24.h
  */
-uint8_t msprf24_queue_state() {
+uint8_t msprf24_queue_state()
+{
 	return r_reg(RF24_FIFO_STATUS);
 }
 
-void msprf24_set_pipe_packetsize(uint8_t pipe, uint8_t size) {
+void msprf24_set_pipe_packetsize(uint8_t pipe, uint8_t size)
+{
 	uint8_t dynpdcfg;
 
 	if (pipe > 5)
 		return;
 
 	dynpdcfg = r_reg(RF24_DYNPD);
-	if (size < 1) {
+	if (size < 1)
+	{
 		if (!(rf_feature & RF24_EN_DPL)) // Cannot set dynamic payload if EN_DPL is disabled.
 			return;
-		if (!((1 << pipe) & dynpdcfg)) {
+		if (!((1 << pipe) & dynpdcfg))
+		{
 			// DYNPD not enabled for this pipe, enable it
 			dynpdcfg |= 1 << pipe;
 		}
-	} else {
+	}
+	else
+	{
 		dynpdcfg &= ~(1 << pipe);  // Ensure DynPD is disabled for this pipe
 		if (size > 32)
 			size = 32;
@@ -347,7 +360,8 @@ void msprf24_set_pipe_packetsize(uint8_t pipe, uint8_t size) {
 	w_reg(RF24_DYNPD, dynpdcfg);
 }
 
-void msprf24_set_retransmit_delay(uint16_t us) {
+void msprf24_set_retransmit_delay(uint16_t us)
+{
 	uint8_t c;
 
 // using 'c' to evaluate current RF speed
@@ -367,26 +381,30 @@ void msprf24_set_retransmit_delay(uint16_t us) {
 }
 
 // Power down device, 0.9uA power draw
-void msprf24_powerdown() {
+void msprf24_powerdown()
+{
 	CE_DIS;
 	msprf24_set_config(0);  // PWR_UP=0
 }
 
 // Enable Standby-I, 26uA power draw
-void msprf24_standby() {
+void msprf24_standby()
+{
 	uint8_t state = msprf24_current_state();
 	if (state == RF24_STATE_NOTPRESENT || state == RF24_STATE_STANDBY_I)
 		return;
 	CE_DIS;
 	msprf24_set_config(RF24_PWR_UP);  // PWR_UP=1, PRIM_RX=0
-	if (state == RF24_STATE_POWERDOWN) { // If we're powering up from deep powerdown...
+	if (state == RF24_STATE_POWERDOWN)
+	{ // If we're powering up from deep powerdown...
 //CE_EN;  // This is a workaround for SI24R1 chips, though it seems to screw things up so disabled for now til I can obtain an SI24R1 for testing.
 		__delay_cycles(DELAY_CYCLES_5MS); // Then wait 5ms for the crystal oscillator to spin up.
 		//CE_DIS;
 	}
 }
 
-uint8_t r_reg(uint8_t addr) {
+uint8_t r_reg(uint8_t addr)
+{
 	uint8_t i;
 
 	CSN_EN;
@@ -396,70 +414,84 @@ uint8_t r_reg(uint8_t addr) {
 	return i;
 }
 
-void w_reg(uint8_t addr, uint8_t data) {
+void w_reg(uint8_t addr, uint8_t data)
+{
 	CSN_EN;
 	rf_status = spi_transfer((addr & RF24_REGISTER_MASK) | RF24_W_REGISTER);
 	spi_transfer(data);
 	CSN_DIS;
 }
 
-inline uint8_t _msprf24_crc_mask() {
+inline uint8_t _msprf24_crc_mask()
+{
 	return (rf_crc & 0x0C);
 }
 
-inline uint8_t _msprf24_irq_mask() {
+inline uint8_t _msprf24_irq_mask()
+{
 	return ~(RF24_MASK_RX_DR | RF24_MASK_TX_DS | RF24_MASK_MAX_RT);
 }
 
-void msprf24_set_retransmit_count(uint8_t count) {
+void msprf24_set_retransmit_count(uint8_t count)
+{
 	uint8_t c;
 
 	c = r_reg(RF24_SETUP_RETR) & 0xF0;
 	w_reg(RF24_SETUP_RETR, c | (count & 0x0F));
 }
 
-uint8_t msprf24_get_last_retransmits() {
+uint8_t msprf24_get_last_retransmits()
+{
 	return r_reg(RF24_OBSERVE_TX) & 0x0F;
 }
 
-uint8_t msprf24_get_lostpackets() {
+uint8_t msprf24_get_lostpackets()
+{
 	return (r_reg(RF24_OBSERVE_TX) >> 4) & 0x0F;
 }
 
-void msprf24_set_address_width() {
+void msprf24_set_address_width()
+{
 	if (rf_addr_width < 3 || rf_addr_width > 5)
 		return;
 	w_reg(RF24_SETUP_AW, ((rf_addr_width - 2) & 0x03));
 }
 
-void msprf24_set_channel() {
+void msprf24_set_channel()
+{
 	if (rf_channel > 125)
 		rf_channel = 0;
 	w_reg(RF24_RF_CH, (rf_channel & 0x7F));
 }
 
-void msprf24_set_speed_power() {
+void msprf24_set_speed_power()
+{
 	if ((rf_speed_power & RF24_SPEED_MASK) == RF24_SPEED_MASK) // Speed setting RF_DR_LOW=1, RF_DR_HIGH=1 is reserved, clamp it to minimum
 		rf_speed_power = (rf_speed_power & ~RF24_SPEED_MASK) | RF24_SPEED_MIN;
 	w_reg(RF24_RF_SETUP, (rf_speed_power & 0x2F));
 }
 
-void msprf24_enable_feature(uint8_t feature) {
-	if ((rf_feature & feature) != feature) {
+void msprf24_enable_feature(uint8_t feature)
+{
+	if ((rf_feature & feature) != feature)
+	{
 		rf_feature |= feature;
 		rf_feature &= 0x07;  // Only bits 0, 1, 2 allowed to be set
 		w_reg(RF24_FEATURE, rf_feature);
 	}
 }
 
-void msprf24_disable_feature(uint8_t feature) {
-	if ((rf_feature & feature) == feature) {
+void msprf24_disable_feature(uint8_t feature)
+{
+	if ((rf_feature & feature) == feature)
+	{
 		rf_feature &= ~feature;
 		w_reg(RF24_FEATURE, rf_feature);
 	}
 }
 
-uint8_t msprf24_set_config(uint8_t cfgval) {
+uint8_t msprf24_set_config(uint8_t cfgval)
+{
 	uint8_t previous_config;
 
 	previous_config = r_reg(RF24_CONFIG);
@@ -467,14 +499,16 @@ uint8_t msprf24_set_config(uint8_t cfgval) {
 	return previous_config;
 }
 
-uint8_t msprf24_is_alive() {
+uint8_t msprf24_is_alive()
+{
 	uint8_t aw;
 
 	aw = r_reg(RF24_SETUP_AW);
 	return ((aw & 0xFC) == 0x00 && (aw & 0x03) != 0x00);
 }
 
-uint8_t msprf24_current_state() {
+uint8_t msprf24_current_state()
+{
 	uint8_t config;
 
 	if (!msprf24_is_alive()) // Can't read/detect a valid value from SETUP_AW? (typically SPI or device fault)
@@ -484,7 +518,8 @@ uint8_t msprf24_current_state() {
 		return RF24_STATE_POWERDOWN;
 	if (!(nrfCEportout & nrfCEpin))      // PWR_UP=1 && CE=0?
 		return RF24_STATE_STANDBY_I;
-	if (!(config & RF24_PRIM_RX)) {      // PWR_UP=1 && CE=1 && PRIM_RX=0?
+	if (!(config & RF24_PRIM_RX))
+	{      // PWR_UP=1 && CE=1 && PRIM_RX=0?
 		if ((r_reg(RF24_FIFO_STATUS) & RF24_TX_EMPTY))  // TX FIFO empty?
 			return RF24_STATE_STANDBY_II;
 		return RF24_STATE_PTX; // If TX FIFO is not empty, we are in PTX (active transmit) mode.
@@ -494,32 +529,37 @@ uint8_t msprf24_current_state() {
 	return RF24_STATE_PRX;           // PWR_UP=1, PRIM_RX=1, CE=1 -- Must be PRX
 }
 
-inline void pulse_ce() {
+inline void pulse_ce()
+{
 	CE_EN;
 	__delay_cycles(DELAY_CYCLES_15US);
 	CE_DIS;
 }
 
-void flush_tx() {
+void flush_tx()
+{
 	CSN_EN;
 	rf_status = spi_transfer(RF24_FLUSH_TX);
 	CSN_DIS;
 }
 
-void flush_rx() {
+void flush_rx()
+{
 	CSN_EN;
 	rf_status = spi_transfer(RF24_FLUSH_RX);
 	CSN_DIS;
 }
 
-void tx_reuse_lastpayload() {
+void tx_reuse_lastpayload()
+{
 	CSN_EN;
 	rf_status = spi_transfer(RF24_REUSE_TX_PL);
 	CSN_DIS;
 	pulse_ce();
 }
 
-uint8_t r_rx_peek_payload_size() {
+uint8_t r_rx_peek_payload_size()
+{
 	uint8_t i;
 
 	CSN_EN;
@@ -529,69 +569,121 @@ uint8_t r_rx_peek_payload_size() {
 	return i;
 }
 
-
 volatile int spi_reading = 0;
-extern IObuffer* nrf_slot;
 volatile int rx_count = 0;
 extern volatile unsigned char RXData;
 extern volatile unsigned char TXData;
 
 //Interrupt functions
 
-enum {
+enum
+{
 	IDLE = 0x00,
 	INIT = 0x02,
 	READ_SIZE = 0x04,
 	PREP = 0x06,
 	START = 0x08,
-	READ = 0x0a,
-	CLEAR_IRQ = 0x0c,
-	CMD_FIFO = 0x0e,
-	FIFO = 0x10,
-	READ_FIFO = 0x12
+	READ_FIRST = 0x0a,
+	READ = 0x0c,
+	CLEAR_IRQ = 0x0e,
+	CMD_FIFO = 0x10,
+	FIFO = 0x12,
+	READ_FIFO = 0x14
 } rx_state = IDLE;
 
+//Begin spi by enabling tx interrupt
 #define START_SPI UCA0IE |= UCTXIE
 
-void spi_start_read() {
-	if (!spi_reading) {
+inline void spi_int()
+{
+	if (!spi_reading)
+	{
 		spi_reading = 1;
-		TXData = (RF24_NOP);
-		CSN_EN;
+		TXData = (RF24_NOP); //Send nop to read status
+		CSN_EN; //Initiates command sequence to radio
 		rx_state = INIT;
-		START_SPI;
-		INT_DIS;
+		START_SPI; //Begin spi transfer
+		INT_DIS; //Disable irq interrupt so as to not be interrupted
 	}
 	return;
 }
 
-inline void nrf_rx_handle() {
-	switch (__even_in_range(rx_state, 0x12)) {
+inline void nrf_rx_handle()
+{
+	static uint8_t irq_clear; //Used to clear specific irq's
+
+	switch (__even_in_range(rx_state, 0x14))
+	{
+	//State when no interrupt is received
 	case IDLE:
 		break;
 
+//Read status (read initiated prior), respond to IRQ sources
 	case INIT:
 		CSN_DIS;
-		rf_status = RXData;
-		if (!(rf_status & RF24_IRQ_RX)) {
-			spi_reading = 0;
-			INT_EN;
-			rx_state = IDLE;
-			break;
+		rf_status = RXData; //Read in status
+
+		//Check for each possible interrupt source
+		if (rf_status & RF24_IRQ_TX)
+		{ //TX success
+		  //If tx succes, increment fifo semafore and
+		  //	clear irq source bit.
+			tx_failed = 0;
+			sem_fifo++;
+
+			//If transmitter, deassert CE pin when fifo is empty
+			if (!nrf_prx)
+				CE_DIS;
+
+			TXData = (RF24_STATUS | RF24_W_REGISTER);
+			irq_clear = RF24_IRQ_TX;
+			rx_state = CLEAR_IRQ;
 		}
-		TXData = RF24_R_RX_PL_WID;
+		else if (rf_status & RF24_IRQ_TXFAILED)
+		{ //TX failed irq, toggle CE and call callback if available
+		  //If tx failed,
+			tx_failed = 1;
+			if (!nrf_prx)
+				CE_DIS;
+			if (nrf_txFailCallback)
+				nrf_txFailCallback();
+			TXData = (RF24_STATUS | RF24_W_REGISTER);
+			irq_clear = RF24_IRQ_TXFAILED;
+			rx_state = CLEAR_IRQ;
+		}
+		else if (rf_status & RF24_IRQ_RX)
+		{ //RX IRQ, begin by sending command to read byte count
+			TXData = RF24_R_RX_PL_WID;
+			rx_state = READ_SIZE;
+		}
+		else
+		{ //No IRQ source, return to idle
+			spi_reading = 0;
+			rx_state = IDLE;
+			INT_EN;
+			if (!nrf_prx)
+			{
+				if (sem_fifo < 3)
+					CE_EN;
+				else
+					CE_DIS;
+			}
+			return; //Return to not start another spi read
+		}
+
 		CSN_EN;
 		START_SPI;
-		rx_state = READ_SIZE;
 		break;
 
+//We need to read the size of the available bytes in the RX FIFO
 	case READ_SIZE:
-		rf_status = RXData;
+		rf_status = RXData; //Command sent, send nop to receive size
 		TXData = (RF24_NOP);
 		START_SPI;
 		rx_state = PREP;
 		break;
 
+//Finish reading byte count, prep reading payload
 	case PREP:
 		CSN_DIS;
 		rx_count = RXData;
@@ -601,39 +693,53 @@ inline void nrf_rx_handle() {
 		rx_state = START;
 		break;
 
+//Command sent, initiate reading from fifo
 	case START:
 		rf_status = RXData;
 		TXData = RF24_NOP;
 		START_SPI;
-		rx_state = READ;
+		rx_state = READ_FIRST;
 		break;
 
+//Read the first byte, ignore if 0, pass to buffer if non zero
+	case READ_FIRST:
+		rx_state = READ;
+		if (!RXData)
+			break;
+
+//Main reading state, read rx_count bytes
 	case READ:
 		IOputc(RXData, nrf_slot);
-		if (!(--rx_count)) {
+		if (!(--rx_count))
+		{
 			CSN_DIS;
 			rx_state = CLEAR_IRQ;
+			irq_clear = RF24_IRQ_RX;
 			TXData = (RF24_STATUS | RF24_W_REGISTER);
 			CSN_EN;
 		}
 		START_SPI;
 		break;
 
+//Send command to clear IRQ in irq_clear variable
 	case CLEAR_IRQ:
 		rf_status = RXData;
-		TXData = RF24_IRQ_RX;
+		TXData = irq_clear;
 		START_SPI;
 		rx_state = CMD_FIFO;
 		break;
 
+//Send command to read fifo state
 	case CMD_FIFO:
 		CSN_DIS;
+
 		TXData = (RF24_FIFO_STATUS | RF24_R_REGISTER);
 		CSN_EN;
 		START_SPI;
 		rx_state = FIFO;
 		break;
 
+//Command sent, begin reading state
 	case FIFO:
 		rf_status = RXData;
 		TXData = RF24_NOP;
@@ -641,28 +747,34 @@ inline void nrf_rx_handle() {
 		rx_state = READ_FIFO;
 		break;
 
+//Read fifo state, return to idle if empty; restart if not
 	case READ_FIFO:
 		CSN_DIS;
-		if (RXData & RF24_RX_EMPTY) {
-			spi_reading = 0;
-			rx_state = IDLE;
-			INT_EN;
-		} else {
+		if (RXData & RF24_RX_EMPTY)
+		{
+			TXData = (RF24_NOP);
+			rx_state = INIT; //Reread status to check for IRQ again
+			START_SPI;
+			CSN_EN;
+		}
+		else
+		{
 			TXData = RF24_R_RX_PL_WID;
 			CSN_EN;
 			START_SPI;
-			rx_state = READ_SIZE;
+			rx_state = READ_SIZE; //Begin again, there is more data in rx fifo
 		}
 		break;
 
+//Abandon all hope ye who enter here.  Or return to idle.
 	default:
 		rx_state = IDLE;
 		break;
 	}
 }
 
-
-inline void port_init() {
+inline void port_init()
+{
 #if nrfIRQport == 1
 	P1DIR &= ~nrfIRQpin;  // IRQ line is input
 	P1OUT |= nrfIRQpin;  // Pull-up resistor enabled

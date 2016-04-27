@@ -30,7 +30,7 @@ int IOputc(char c, IObuffer* iob) {
 
 	// Signal that there are bytes ready (if it was empty)
 	// (check that the callback isn't null. maybe this would be a flag)
-	if (!iob->count++ && iob->bytes_ready)
+	if (!(iob->count++ && iob->callback_once) && iob->bytes_ready)
 		iob->bytes_ready();
 
 	__enable_interrupt();
@@ -161,6 +161,7 @@ IObuffer* IObuffer_create(int size) {
 	iob->count = 0;
 	iob->size = size;
 	iob->bytes_ready = 0;
+	iob->callback_once = 0;
 
 	return iob;
 }

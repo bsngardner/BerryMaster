@@ -25,18 +25,19 @@
 // available functions
 int nrf_init(int freq, int speed);
 void nrf_close();
-int nrf_open();
+int nrf_open(uint8_t is_prx);
 int nrf_flush();
-int nrf_sendBytes();
-int nrf_TXEvent();
+int nrf_sendPacket();
+void nrf_sendPing();
 
-void spi_start_read();
+void spi_int();
 
 /* Settings for 16MHz MCLK */
 #define MPU_HZ 24000000
 #define DELAY_CYCLES_5MS       MPU_HZ/200
 #define DELAY_CYCLES_130US     MPU_HZ/7692
 #define DELAY_CYCLES_15US      MPU_HZ/66667
+#define DELAY_CYCLES_100MS     MPU_HZ/10
 #define DELAY_CYCLES_250US	DELAY_CYCLES_5MS/20
 
 #define NRF_BUF_SIZE 96

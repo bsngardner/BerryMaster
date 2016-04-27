@@ -127,7 +127,6 @@ void msprf24_irq_clear(uint8_t irqflag); /* Clear specified Interrupt Flags (RF2
  * Required to allow further transmissions to continue.
  */
 inline void nrf_rx_handle();
-void spi_start_read();
 extern volatile int spi_reading;
 
 #endif /* NRFRADIO_H_ */

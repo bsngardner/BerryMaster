@@ -45,7 +45,8 @@ void addToMessage(char c);
 #define FT201X_I2C_DATA_LOW			PJDIR |= ASDA		// put data low
 #define FT201X_I2C_DATA_HIGH		PJDIR &= ~ASDA		// put data high (pull-up)
 
-#define FT201X_I2C_READ_DATA		PJIN & ASDA		// read state of data pin
+#define FT201X_I2C_READ_DATA		(PJIN & ASDA)		// read state of data pin
+#define FT201X_I2C_READ_CLOCK		(PJIN & ASCL)		// read state of clock pin
 #else
 #error 666
 #endif
@@ -241,6 +242,10 @@ int ft201x_i2c_read() {
 	// TODO: this is not the number of bytes you are looking for!
 	// (not the documented behavior)
 	return 0;
+}
+
+uint8_t ft201x_powered(){
+	return (FT201X_I2C_READ_DATA && FT201X_I2C_READ_CLOCK);
 }
 
 // Poll the USB input buffer.
