@@ -62,7 +62,8 @@ static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value);
  * here for the sake of portability of host code
  * just returns 0 for success
  */
-int connectToMaster() {
+int connectToMaster()
+{
 	return SUCCESS;
 }
 
@@ -70,7 +71,8 @@ int connectToMaster() {
  * here for the sake of portability of host code
  * just returns 0 for success
  */
-int disconnectFromMaster() {
+int disconnectFromMaster()
+{
 	return SUCCESS;
 }
 
@@ -82,11 +84,12 @@ int disconnectFromMaster() {
  * 	 iterates hal_getNewDevice(newDevAddr)
  * @return SUCCESS for success.
  */
-int initDevices() {
+int initDevices()
+{
 	int error;
-//	if (error = hal_resetAllDevices())
-//		return error;
 	if (error = hal_init())
+		return error;
+	if (error = hal_resetAllDevices())
 		return error;
 	if (error = validateDeviceList())
 		return error;
@@ -101,16 +104,19 @@ int initDevices() {
  * 	       unknown (0) if device is not on network
  * @return SUCCESS for success; 1 if the device is not on the network.
  */
-int getDeviceType(uint8_t addr, uint8_t* deviceType) {
+int getDeviceType(uint8_t addr, uint8_t* deviceType)
+{
 	// Is there a device at this address?
-	if (!addrIsUsed(addr)) {
+	if (!addrIsUsed(addr))
+	{
 		// No - return failed.
-		*deviceType = (int)UNKNOWN;
+		*deviceType = (int) UNKNOWN;
 		return DEVICE_NOT_FOUND;
 	}
-	else {
+	else
+	{
 		// Yes, there is a device - set the type and return success.
-		*deviceType = (int)myDeviceList.devices[addr].deviceType;
+		*deviceType = (int) myDeviceList.devices[addr].deviceType;
 		return SUCCESS;
 	}
 }
@@ -122,27 +128,33 @@ int getDeviceType(uint8_t addr, uint8_t* deviceType) {
  * @param the register to read
  * @return SUCCESS if successful, non-zero if failed
  */
-int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg) {
+int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg)
+{
 	int error;
 	// invalid address for a device
-	if (addr == 0 || addr > MAX_NUM_DEVICES) {
+	if (addr == 0 || addr > MAX_NUM_DEVICES)
+	{
 		*value = 0xff;
 		return INVALID_ADDR;
 	}
 	// valid address, but there is no device on the network at this address
-	else if (!addrIsUsed(addr)) {
+	else if (!addrIsUsed(addr))
+	{
 		*value = 0xff;
 		return DEVICE_NOT_FOUND;
 	}
 	// valid device
-	else {
+	else
+	{
 		// call hal to get the value.
-		if (error = hal_getDeviceRegister(addr, reg, value)) {
+		if (error = hal_getDeviceRegister(addr, reg, value))
+		{
 			// operation failed
 			*value = 0xff;
 			return error;
 		}
-		else {
+		else
+		{
 			// operation successful
 			return SUCCESS;
 		}
@@ -157,27 +169,33 @@ int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg) {
  * @param count - number of bytes to read
  */
 int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
-		uint8_t count) {
+		uint8_t count)
+{
 	int error;
 	// invalid address for a device
-	if (addr == 0 || addr > MAX_NUM_DEVICES) {
+	if (addr == 0 || addr > MAX_NUM_DEVICES)
+	{
 		buff[0] = 0xff;
 		return INVALID_ADDR;
 	}
 	// valid address, but there is no device on the network at this address
-	else if (!addrIsUsed(addr)) {
+	else if (!addrIsUsed(addr))
+	{
 		buff[0] = 0xff;
 		return DEVICE_NOT_FOUND;
 	}
 	// valid device
-	else {
+	else
+	{
 		// call hal to get the value.
-		if (error = hal_getDeviceMultiRegs(addr, reg, buff, count)) {
+		if (error = hal_getDeviceMultiRegs(addr, reg, buff, count))
+		{
 			// operation failed
 			buff[0] = 0xff;
 			return error;
 		}
-		else {
+		else
+		{
 			// operation successful
 			return SUCCESS;
 		}
@@ -191,23 +209,29 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
  * @param the register to write
  * @return SUCCESS if successful, non-zero if failed
  */
-int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg) {
+int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg)
+{
 	// invalid address for a device
-	if (addr == 0 || addr > MAX_NUM_DEVICES) {
+	if (addr == 0 || addr > MAX_NUM_DEVICES)
+	{
 		return 1;
 	}
 	// valid address, but device doesn't exist
-	else if (!addrIsUsed(addr)) {
+	else if (!addrIsUsed(addr))
+	{
 		return 2;
 	}
 	// valid address for a device
-	else {
+	else
+	{
 		// call hal to set the value to the device.
-		if (hal_setDeviceRegister(addr, reg, value)) {
+		if (hal_setDeviceRegister(addr, reg, value))
+		{
 			// operation failed
 			return 3;
 		}
-		else {
+		else
+		{
 			// operation successful
 			return SUCCESS;
 		}
@@ -221,9 +245,11 @@ int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg) {
 /* clearNetwork
  * clears all info about devices in the network
  */
-void clearNetwork() {
+void clearNetwork()
+{
 	int i;
-	for (i = 1; i < DEVICES_ARRAY_SIZE; i++) {
+	for (i = 1; i < DEVICES_ARRAY_SIZE; i++)
+	{
 		// TODO: will probably call a hal function that
 		// wipes the device from the network
 		myDeviceList.devices[i].deviceAddress = 0;
@@ -242,7 +268,8 @@ void clearNetwork() {
  * if it doesn't respond, take it off the network list.
  * @return SUCCESS if successful, non-zero if failed
  */
-static int validateDeviceList() {
+static int validateDeviceList()
+{
 	int i = 0;
 	int error;
 	int addr = 1;
@@ -254,13 +281,16 @@ static int validateDeviceList() {
 	//   (a) we've checked all devices previously on the network, or
 	//   (b) we've iterated through the entire array of devices
 	//		 (there's a problem if this happens)
-	while (i < tempNumDevices && addr < DEVICES_ARRAY_SIZE) {
+	while (i < tempNumDevices && addr < DEVICES_ARRAY_SIZE)
+	{
 		// is the device currently configured?
-		if (addrIsUsed(addr)) { // yes,
+		if (addrIsUsed(addr))
+		{ // yes,
 			i++;
 			// ping the device to see if it's still there:
 			error = hal_pingDevice(myDeviceList.devices[addr].deviceAddress);
-			if (error) {
+			if (error)
+			{
 				// no device on this address
 				// erase the device from the network list
 				myDeviceList.devices[addr].deviceAddress = 0;
@@ -272,7 +302,8 @@ static int validateDeviceList() {
 		}
 		addr++;
 	}
-	if (i < tempNumDevices) {
+	if (i < tempNumDevices)
+	{
 		// error - didn't check all previously connected berries
 		return VALIDATE_LIST_ERR; // return failed
 	}
@@ -287,14 +318,17 @@ static int validateDeviceList() {
  *       initialize that device in the network
  *     else return
  */
-static int getNewDevices() {
+static int getNewDevices()
+{
 	int error;
 	uint8_t addr;
 	uint8_t type;
 
-	while(1) {
+	while (1)
+	{
 		addr = findUnusedAddress();
-		if (addr == 0) {
+		if (addr == 0)
+		{
 			// error - full network
 			// todo: Note - If we have exactly the
 			// maximum number of allowed devices then this will return an
@@ -303,12 +337,14 @@ static int getNewDevices() {
 			return NETWORK_FULL;
 		}
 		// Offer a new address to an open device.
-		else if (!(hal_discoverNewDevice(addr))) {
+		else if (!(hal_discoverNewDevice(addr)))
+		{
 			// A new device grabbed the requested address!
 			// Record the address of the device.
 			myDeviceList.devices[addr].deviceAddress = addr;
 			// get the type of the device and assign the type
-			if (error = getDeviceTypeFromHal(addr, &type)) {
+			if (error = getDeviceTypeFromHal(addr, &type))
+			{
 				// error - failed to get the type from the device
 				myDeviceList.devices[addr].deviceType = UNKNOWN;
 				//reportError("unknown dev type", error, io_usb_out);
@@ -317,7 +353,8 @@ static int getNewDevices() {
 			// Successfully got the type
 			myDeviceList.devices[addr].deviceType = type;
 		}
-		else return SUCCESS; // no devices grabbed the address - we're done
+		else
+			return SUCCESS; // no devices grabbed the address - we're done
 	}
 }
 
@@ -326,9 +363,11 @@ static int getNewDevices() {
  * @return the lowest num unused address in the network;
  *     0 if there are no open addresses
  */
-static uint8_t findUnusedAddress() {
+static uint8_t findUnusedAddress()
+{
 	int i = 1;
-	while (addrIsUsed(i) && i < DEVICES_ARRAY_SIZE) i++;
+	while (addrIsUsed(i) && i < DEVICES_ARRAY_SIZE)
+		i++;
 	if (i >= DEVICES_ARRAY_SIZE)
 		return 0;
 	else
@@ -340,7 +379,8 @@ static uint8_t findUnusedAddress() {
  * @param addr the address of the device on the network
  * @param the variable in which we want to stor the value
  */
-static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value) {
+static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value)
+{
 #define REG_TYPE 0
 	return getDeviceValue(addr, value, REG_TYPE);
 }

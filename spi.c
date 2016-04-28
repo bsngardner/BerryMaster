@@ -29,7 +29,7 @@ int spi_init(void) {
 	UCA0CTLW0 |= UCMST + UCSYNC + UCCKPH + UCMSB;// 3-pin, 8-bit, master, polarity high, MSB
 	// TODO: We changed this from UCCKPL to UCCKPH for the Radio--does that break SD???
 	UCA0CTLW0 |= UCSSEL__SMCLK;				// SMCLK
-	UCA0BR0 = 0x3;							// /2
+	UCA0BR0 = 3;							// /3
 	UCA0BR1 = 0;							//
 	UCA0MCTLW = 0;							// No modulation
 	UCA0CTLW0 &= ~UCSWRST;					// **Initialize USCI state machine**

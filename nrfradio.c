@@ -197,7 +197,7 @@ int nrf_sendPacket()
 	spi_transfer(data);
 	if (!data)
 	{
-		if (count)
+		if (count == PAYLOAD_SIZE)
 			count--;
 		spi_transfer(0);
 	}

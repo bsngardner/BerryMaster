@@ -23,17 +23,17 @@
 #define WDT_CLKS_PER_SEC	512				// 512 Hz WD clock (@32 kHz)
 #define WDT_CTL				WDT_ADLY_1_9	// 1.95 ms
 #define DEBOUNCE_CNT		80
-#define USB_POLL_CNT		25
-#define NRF_PING_MAX		8
+#define USB_POLL_CNT		1
+#define NRF_PING_MAX		2
 #define NRF_PING_MIN		1
-#define TEST_COUNT			100
+#define TEST_COUNT			0
 #define MAX_EVENT_ERRORS	10
 
 // Global variables
 static volatile int WDT_cps_cnt; // one second counter
 static volatile int usb_poll_cnt; // when 0, the usb is polled for data
-static volatile int nrf_ping_cnt;
-static volatile int nrf_ping_timeout;
+static volatile int nrf_ping_cnt = 0;
+static volatile int nrf_ping_timeout = 0;
 static volatile int debounceCnt; // debounce counter
 static volatile int test_cnt; // test counter
 volatile uint16_t sys_event; // holds all events
@@ -49,31 +49,29 @@ void events_testRX();
 IObuffer* test_slot;
 IObuffer* test_buffer;
 
-#define PRX 0
+#define MASTER 1
 
 //Init all buffer and slot connections
 void events_init()
 {
-	nrf_init(120, 2);
-	nrf_open(PRX);
-#if PRX==0
-	test_cnt = 0;
-#else
-	test_cnt = 0;
-#endif
-	//server_init();
+	nrf_open(!MASTER);
+	test_cnt = TEST_COUNT;
 
+#if MASTER
+	server_init();
+	nrf_ping_cnt = nrf_ping_timeout = NRF_PING_MIN;
+	usb_poll_cnt = 0;
+	nrf_slot = server_buffer;
+	server_slot = nrf_buffer;
+	server_buffer->bytes_ready = events_serverCallback;
+#else
+	usb_poll_cnt = USB_POLL_CNT;
 	nrf_slot = usb_buffer;
 	usb_slot = nrf_buffer;
+	usb_buffer->bytes_ready = events_usbCallback;
+#endif
 
 	nrf_buffer->bytes_ready = events_nrfCallback;
-	usb_buffer->bytes_ready = events_usbCallback;
-	//server_buffer->bytes_ready = events_serverCallback;
-
-	usb_poll_cnt = USB_POLL_CNT;
-#if  PRX==0
-	nrf_ping_cnt = nrf_ping_timeout = NRF_PING_MIN;
-#endif
 }
 
 void eventsLoop()
@@ -94,15 +92,10 @@ void eventsLoop()
 		// At least 1 event is pending
 		__enable_interrupt();
 
-		// Output is ready to be sent to the host:
-		if (sys_event & USB_O_EVENT)
+		if (sys_event & NRF_PING_EVENT)
 		{
-			sys_event &= ~USB_O_EVENT;
-			if (USBOutEvent())
-			{
-				// We're not finished, queue up this event again.
-				sys_event |= USB_O_EVENT;
-			}
+			sys_event &= ~NRF_PING_EVENT;
+			nrf_sendPing();
 		}
 
 		// Input is available from the host:
@@ -120,13 +113,6 @@ void eventsLoop()
 			serverEvent();
 		}
 
-		//event for testing regular stuff
-		else if (sys_event & TEST_EVENT)
-		{
-			sys_event &= ~TEST_EVENT;
-			events_test();
-		}
-
 		//Radio data ready to send
 		else if (sys_event & NRF_EVENT)
 		{
@@ -138,16 +124,29 @@ void eventsLoop()
 			}
 		}
 
-		else if (sys_event & NRF_PING_EVENT)
+		// Output is ready to be sent to the host:
+		else if (sys_event & USB_O_EVENT)
 		{
-			sys_event &= ~NRF_PING_EVENT;
-			nrf_sendPing();
+			sys_event &= ~USB_O_EVENT;
+			if (USBOutEvent())
+			{
+				// We're not finished, queue up this event again.
+				sys_event |= USB_O_EVENT;
+			}
+		}
+
+		//event for testing regular stuff
+		else if (sys_event & TEST_EVENT)
+		{
+			sys_event &= ~TEST_EVENT;
+			events_test();
 		}
 
 		// Ready to servic a pending request from the host:
 		else if (sys_event & HEARTBEAT_EVENT)
 		{
 			sys_event &= ~HEARTBEAT_EVENT;
+			LED0_OFF;
 		}
 
 		// Error - Unrecognized event.
@@ -174,24 +173,23 @@ void eventsLoop()
 
 void events_test()
 {
-	static count = 0;
-	iofprintf(nrf_buffer, "%d", ++count);
+	static long count = 0;
+	iofprintf(nrf_buffer, "%ld, ", ++count);
 	LED0_OFF;
 }
 
 void events_usbCallback()
 {
 	sys_event |= USB_O_EVENT;
-#if PRX==0
-	nrf_ping_timeout = nrf_ping_cnt = NRF_PING_MIN;
-	sys_event |= NRF_PING_EVENT;
-
-#endif
 }
 
 void events_serverCallback()
 {
 	sys_event |= SERVER_EVENT;
+#if MASTER
+	nrf_ping_timeout = nrf_ping_cnt = NRF_PING_MIN;
+	sys_event |= NRF_PING_EVENT;
+#endif
 }
 
 void events_nrfCallback()
@@ -268,12 +266,14 @@ __interrupt void WDT_ISR(void)
 // One second elapsed
 	--WDT_cps_cnt;
 	if (WDT_cps_cnt == WDT_CLKS_PER_SEC / 4)
-		//LED0_ON; // toggle heartbeat LED
-		if (WDT_cps_cnt == 0)
-		{
-			WDT_cps_cnt = WDT_CLKS_PER_SEC;
-			//sys_event |= HEARTBEAT_EVENT;
-		}
+	{
+		LED0_ON; // toggle heartbeat LED
+	}
+	if (WDT_cps_cnt == 0)
+	{
+		WDT_cps_cnt = WDT_CLKS_PER_SEC;
+		sys_event |= HEARTBEAT_EVENT;
+	}
 
 // Should we poll the USB?
 	if (usb_poll_cnt && !(--usb_poll_cnt))
@@ -325,6 +325,7 @@ __interrupt void Port_1_ISR(void)
 		spi_int();
 		break;
 	case IV1_3: //SW1
+		WDTCTL = 0; //Reset the proc with a PUC
 		debounceCnt = DEBOUNCE_CNT;
 		P1IFG &= ~SW1;
 		break;
