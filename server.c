@@ -2,7 +2,9 @@
  * rpcHandlers.c
  *
  *  Created on: Dec 3, 2015
- *      Author: Berry_Admin
+ *      Authors:
+ *      Marshall Garey
+ *      Broderick Gardner
  */
 
 // Standard header files
@@ -62,7 +64,7 @@ void server_init()
 /*
  * Services a pending request from the host.
  */
-int serverEvent()
+int server_event()
 {
 	uint8_t opcode;
 	int error;
@@ -83,23 +85,23 @@ int serverEvent()
 	// handle the request:
 	switch (opcode)
 	{
-	case OPCODE_INIT_DEVICES:
+	case OP_INIT_DEVICES:
 		// init the network (also sends a reply to the host)
 		rpc_initDevices();
 		break;
-	case OPCODE_GET_DEVICE_TYPE:
+	case OP_GET_DEV_TYPE:
 		// get the device type (this also sends a reply to the host)
 		rpc_getDeviceType();
 		break;
-	case OPCODE_GET_DEVICE_VALUE:
+	case OP_GET_DEV_VAL:
 		// Get the specified register value in the berry.
 		rpc_getDeviceValue();
 		break;
-	case OPCODE_GET_DEVICE_MULTI_VALUES:
+	case OP_GET_MUL_VALS:
 		// Get specified register values in the berry.
 		rpc_getDeviceMultiValues();
 		break;
-	case OPCODE_SET_DEVICE_VALUE:
+	case OP_SET_DEV_VAL:
 		// Set the specified register value in the berry.
 		rpc_setDeviceValue();
 		break;
@@ -141,7 +143,6 @@ int isValidMessage()
  */
 void rpc_initDevices()
 {
-
 	// Get the project has from the message
 	uint8_t project_hash;
 	READ(project_hash);
@@ -158,23 +159,20 @@ void rpc_initDevices()
 // and sends reply back to host
 void rpc_getDeviceType()
 {
-
 	// Get the address from the message
 	uint8_t addr;
 	READ(addr);
 
 	// Get the type of the berry
-	uint8_t type[2];
-	uint8_t result = getDeviceType(addr, type);
-	type[1] = 0;
+	uint8_t type;
+	uint8_t result = getDeviceType(addr, &type);
 
 	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH + 1, result, type, 1);
+	setReply(STD_REPLY_LENGTH + 1, result, &type, 1);
 }
 
 void rpc_getDeviceValue()
 {
-
 	// Get the address from the message
 	uint8_t addr;
 	READ(addr);
@@ -194,7 +192,6 @@ void rpc_getDeviceValue()
 
 void rpc_getDeviceMultiValues()
 {
-
 	// Get the address from the message
 	uint8_t addr;
 	READ(addr);
@@ -225,19 +222,10 @@ void rpc_getDeviceMultiValues()
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH + count, result, buff, count);
-
-//	IOputc(STD_REPLY_LENGTH + count, io_usb_out);
-//	IOputc((uint8_t)TYPE_REPLY, io_usb_out);
-//	IOputc(result, io_usb_out);
-//	int i;
-//	for (i = 0; i < count; i++) {
-//		IOputc(buff[i], io_usb_out);
-//	}
 }
 
 void rpc_setDeviceValue()
 {
-
 	// Get the address from the message
 	uint8_t addr;
 	READ(addr);
@@ -269,13 +257,28 @@ void rpc_setDeviceValue()
  */
 void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff, uint8_t count)
 {
-
 	// Standard reply data: length, type, and result
 	WRITE(replyLength);
-	WRITE(TYPE_REPLY);
+	WRITE(MSG_REPLY);
 	WRITE(result);
 
 	if (buff)
 		WRITE_N(buff, count);
 	return;
+}
+
+/*
+ * Sends a message to the host of type interrupt
+ */
+void interrupt_host(uint8_t intr_source, uint8_t *buff, uint8_t count)
+{
+	WRITE(count+2); // length = count + 1 (MSG_INT) + 1 (intr source)
+	WRITE(MSG_INTERRUPT); // msg type
+	WRITE(intr_source); // interrupt source (0 for master, nonzero for berry)
+
+	// any additional information from the master or berry
+	if (buff)
+	{
+		WRITE_N(buff, count);
+	}
 }

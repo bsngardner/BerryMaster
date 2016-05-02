@@ -12,6 +12,7 @@
 #define USB_I_EVENT 	0x01
 #define USB_O_EVENT 	0x02
 #define SERVER_EVENT 	0x04
+#define HOT_SWAP_EVENT	0x08
 #define HEARTBEAT_EVENT 0x80
 
 /*

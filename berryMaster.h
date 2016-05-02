@@ -206,14 +206,6 @@ int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg);
  * Other function prototypes **************************************************
  *****************************************************************************/
 
-/* reportError
- * prints an error message and number to the console
- * @param msg - the error message to print
- * @param err - the error number to print
- * @param buff - the buffer in which to put the message
- */
-void reportError(char* msg, int err, IObuffer* buff);
-
 /*
  * spins in an infinite loop, toggling LEDs 0 and 1
  */

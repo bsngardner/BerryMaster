@@ -269,7 +269,7 @@ int ft201x_i2c_read()
 }
 
 // Poll the USB input buffer.
-void USBInEvent()
+void usb_in_event()
 {
 	// Read input characters from computer into io_usb_in
 	if (!(setjmp(usb_i2c_context)))
@@ -287,7 +287,7 @@ void USBInEvent()
 }
 
 // Write the passed in io buffer to the usb
-int USBOutEvent()
+int usb_out_event()
 {
 	int err;
 

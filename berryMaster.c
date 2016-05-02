@@ -105,13 +105,20 @@ int initDevices(uint8_t project_hash)
 	{
 		clearNetwork();
 		fram_proj_hash = project_hash;
+		hal_check_proj_hash(project_hash);
+
+		// Look for new devices on the network.
+		if (error = getNewDevices())
+			return error;
 	}
-	// Validate the device list we have.
-	if (error = validateDeviceList())
-		return error;
-	// Look for new devices on the network.
-	if (error = getNewDevices())
-		return error;
+	// Project key is the same. Check to see if the devices are still there.
+	// If not, then return an error.
+	else
+	{
+		// Validate the device list we have.
+		if (error = validateDeviceList())
+			return error;
+	}
 
 	// We're done.
 	return SUCCESS; // success
@@ -281,7 +288,7 @@ static void clearNetwork()
 	}
 	myDeviceList.currNumDevices = 0;
 
-//	hal_resetAllDevices();
+	hal_resetAllDevices();
 }
 
 /* validateDeviceList

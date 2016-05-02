@@ -16,8 +16,8 @@ void ft201x_i2c_write();
 int ft201x_i2c_read();
 int ft201x_flushBuffers();
 void ft201x_setUSBCallback(void (*callback)(void));
-void USBInEvent();
-int USBOutEvent();
+void usb_in_event();
+int usb_out_event();
 
 // Global variables
 extern jmp_buf usb_i2c_context;	// error context

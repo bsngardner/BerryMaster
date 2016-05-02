@@ -2,7 +2,9 @@
  * events.c
  *
  *  Created on: Mar 25, 2016
- *      Author: Berry_Admin
+ *      Authors:
+ *      Marshall Garey
+ *      Broderick Gardner
  */
 
 // Standard includes
@@ -10,7 +12,6 @@
 
 // Local includes
 #include "events.h"
-
 #include "berryMaster.h"
 #include "IObuffer.h"
 #include "server.h"
@@ -20,18 +21,21 @@
 #define WDT_CLKS_PER_SEC	512				// 512 Hz WD clock (@32 kHz)
 #define WDT_CTL				WDT_ADLY_1_9	// 1.95 ms
 #define DEBOUNCE_CNT		80
+#define HOT_SWAP_POLL_CNT	(WDT_CLKS_PER_SEC>>1) // 1/2 second
 #define USB_POLL_CNT		1
 #define MAX_EVENT_ERRORS	10
 
 // Global variables
 static volatile int WDT_cps_cnt; // one second counter
+static volatile int hot_swap_cnt; // when 0, check on the berries
 static volatile int usb_poll_cnt; // when 0, the usb is polled for data
 static volatile int debounceCnt; // debounce counter
 volatile uint16_t sys_event; // holds all events
 
 //Function prototypes
-void events_usbCallback();
-void events_serverCallback();
+void events_usb_callback();
+void events_server_callback();
+static void hot_swap_event();
 
 //Init all buffer and slot connections
 void events_init()
@@ -40,8 +44,8 @@ void events_init()
 	server_slot = usb_buffer;
 	usb_slot = server_buffer;
 
-	ft201x_setUSBCallback(events_usbCallback);
-	server_buffer->bytes_ready = events_serverCallback;
+	ft201x_setUSBCallback(events_usb_callback);
+	server_buffer->bytes_ready = events_server_callback;
 }
 
 void eventsLoop()
@@ -68,7 +72,7 @@ void eventsLoop()
 			if (sys_event & USB_O_EVENT)
 			{
 				sys_event &= ~USB_O_EVENT;
-				if (USBOutEvent())
+				if (usb_out_event())
 				{
 					// We're not finished, queue up this event again.
 					sys_event |= USB_O_EVENT;
@@ -80,14 +84,20 @@ void eventsLoop()
 			else if (sys_event & USB_I_EVENT)
 			{
 				sys_event &= ~USB_I_EVENT;
-				USBInEvent();
+				usb_in_event();
 			}
 
-			// Ready to servic a pending request from the host:
+			// Ready to service a pending request from the host:
 			else if (sys_event & SERVER_EVENT)
 			{
 				sys_event &= ~SERVER_EVENT;
-				serverEvent();
+				server_event();
+			}
+
+			else if (sys_event & HOT_SWAP_EVENT)
+			{
+				sys_event &= ~HOT_SWAP_EVENT;
+				hot_swap_event();
 			}
 
 			// Ready to servic a pending request from the host:
@@ -119,43 +129,15 @@ void eventsLoop()
 	}
 }
 
-void events_usbCallback()
+void events_usb_callback()
 {
 	sys_event |= USB_O_EVENT;
 }
 
-void events_serverCallback()
+void events_server_callback()
 {
 	sys_event |= SERVER_EVENT;
 	LED1_ON;
-}
-
-// Reports an error to the user
-void reportError(char* msg, int err, IObuffer* buff)
-{
-	int byteCount;
-	//buff = io_usb_out;
-	// Fill up the buffer - it's easier for us to fill up the buffer all the
-	// way than to try to count the size of each error message.
-	// Because the length byte isn't part of the message, put size-1 as length.
-	IOputc((char) (buff->size - 1), buff);
-	// put the type of message (error) in the buffer
-	IOputc((char) (TYPE_ERROR), buff);
-	// put the error code in
-	IOputc((char) err, buff);
-	// put the message in - count how many bytes that is
-	byteCount = IOputs(msg, buff);
-	// is there space left in the buffer
-	if (byteCount > 0)
-	{
-		// yes, fill up the remaining space with nulls
-		while (IOputc(0, buff) == SUCCESS)
-			;
-	}
-	// no, buffer is full - didn't finish putting message into buffer.
-	// just send the message as is.
-	while (USBOutEvent(buff))
-		; // keep calling until it returns done.
 }
 
 // Initialize the Watchdog Timer
@@ -166,7 +148,16 @@ int WDT_init()
 
 	WDT_cps_cnt = WDT_CLKS_PER_SEC;	// set WD 1 second counter
 	usb_poll_cnt = USB_POLL_CNT;
+	hot_swap_cnt = HOT_SWAP_POLL_CNT;
 	return 0;
+}
+
+// TODO: move to berry_master.c
+static void hot_swap_event()
+{
+	uint8_t buff[2] =
+	{ 0xFE, 0xED };
+	interrupt_host(0, buff, 2);
 }
 
 //-----------------------------------------------------------------------------
@@ -175,7 +166,6 @@ int WDT_init()
 #pragma vector = WDT_VECTOR
 __interrupt void WDT_ISR(void)
 {
-
 	// One second elapsed
 	--WDT_cps_cnt;
 	if (WDT_cps_cnt == WDT_CLKS_PER_SEC / 4)
@@ -186,13 +176,20 @@ __interrupt void WDT_ISR(void)
 		sys_event |= HEARTBEAT_EVENT;
 	}
 
+	// Should we check on the berries?
+	--hot_swap_cnt;
+	if (hot_swap_cnt == 0)
+	{
+		hot_swap_cnt = HOT_SWAP_POLL_CNT;
+		sys_event |= HOT_SWAP_EVENT;
+	}
+
 	// Should we poll the USB?
 	--usb_poll_cnt;
 	if (usb_poll_cnt == 0)
 	{
 		sys_event |= USB_I_EVENT; // poll the usb chip (ft201x)
 		usb_poll_cnt = USB_POLL_CNT; // 1/16 sec
-		__bic_SR_register_on_exit(LPM0_bits); // wake up on exit
 	}
 
 	// Are we currently debouncing the switch?
@@ -206,6 +203,12 @@ __interrupt void WDT_ISR(void)
 			// to signal some kind of button event.
 			LED1_TOGGLE;
 		}
+	}
+
+	// Wake up if a system event is pending
+	if (sys_event)
+	{
+		__bic_SR_register_on_exit(LPM0_bits);
 	}
 }
 
@@ -234,14 +237,4 @@ __interrupt void Port_1_ISR(void)
 		debounceCnt = DEBOUNCE_CNT; // set debounce count
 		P1IFG &= ~SW1; // clear interrupt flag
 	}
-
-	// Radio interrupt?
-//	if (P1IFG & INT) {
-//		P1IFG &= ~INT;
-//		if (bdl_config.radio_cfg.radio_mode)
-//			rf_irq |= RF24_IRQ_FLAGGED;
-//		sys_event |= INTERRUPT;
-//		__bic_SR_register_on_exit(LPM0_bits);
-//	}
-
 }
