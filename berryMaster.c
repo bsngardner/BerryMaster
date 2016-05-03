@@ -7,15 +7,19 @@
 
 #include "berryMaster.h"
 #include "hal.h"
+#include "server.h"
 
 /******************************************************************************
  variables ********************************************************************
  *****************************************************************************/
 #pragma PERSISTENT(myDeviceList)
-DeviceList_t myDeviceList = { 0 };
+DeviceList_t myDeviceList =
+{ 0 };
 
 #pragma PERSISTENT(fram_proj_hash)
 uint8_t fram_proj_hash = 0;
+
+static uint8_t proj_initialized = FALSE;
 
 /******************************************************************************
  function prototypes and macros ***********************************************
@@ -32,6 +36,11 @@ uint8_t fram_proj_hash = 0;
  */
 static void clearNetwork();
 
+/* check_params
+ * checks to make sure the address is okay and the device is still there
+ */
+static int check_params(uint8_t addr);
+
 /* validateDeviceList
  *  pings each device in the list
  *  if the device doesn't respond, take this device out of the list
@@ -39,7 +48,7 @@ static void clearNetwork();
  */
 static int validateDeviceList();
 
-/* getNewDevices
+/* find_all_new_devices
  * while(1):
  *   get an available address
  *   call hal_getNewDevice(addr)
@@ -48,7 +57,14 @@ static int validateDeviceList();
  *     else return
  * @return SUCCESS if successful, non-zero if failed
  */
-static int getNewDevices();
+static int find_all_new_devices();
+
+/* find_new_device
+ * Looks for a new device
+ * Returns the address
+ * If the address is 0, then there was no new device
+ */
+static int find_new_device();
 
 /* findUnusedAddress
  * @return the iterator to an uncofigured device in the list
@@ -108,7 +124,7 @@ int initDevices(uint8_t project_hash)
 		hal_check_proj_hash(project_hash);
 
 		// Look for new devices on the network.
-		if (error = getNewDevices())
+		if (error = find_all_new_devices())
 			return error;
 	}
 	// Project key is the same. Check to see if the devices are still there.
@@ -121,6 +137,7 @@ int initDevices(uint8_t project_hash)
 	}
 
 	// We're done.
+	proj_initialized = TRUE;
 	return SUCCESS; // success
 }
 
@@ -132,22 +149,14 @@ int initDevices(uint8_t project_hash)
  */
 int getDeviceType(uint8_t addr, uint8_t* deviceType)
 {
-	// Is it a valid address?
-	if (addr <= 0 || addr > MAX_NUM_DEVICES)
+	int error;
+	if (error = check_params(addr))
 	{
 		*deviceType = UNKNOWN;
-		return INVALID_ADDR;
-	}
-	// Is there a device at this address?
-	if (!addrIsUsed(addr))
-	{
-		// No - return failed.
-		*deviceType = UNKNOWN;
-		return DEVICE_NOT_FOUND;
+		return error;
 	}
 	else
 	{
-		// Yes, there is a device - set the type and return success.
 		*deviceType = myDeviceList.devices[addr].deviceType;
 		return SUCCESS;
 	}
@@ -163,33 +172,13 @@ int getDeviceType(uint8_t addr, uint8_t* deviceType)
 int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg)
 {
 	int error;
-	// invalid address for a device
-	if (addr == 0 || addr > MAX_NUM_DEVICES)
+	if (error = check_params(addr))
 	{
-		*value = 0xff;
-		return INVALID_ADDR;
+		return error;
 	}
-	// valid address, but there is no device on the network at this address
-	else if (!addrIsUsed(addr))
-	{
-		*value = 0xff;
-		return DEVICE_NOT_FOUND;
-	}
-	// valid device
 	else
 	{
-		// call hal to get the value.
-		if (error = hal_getDeviceRegister(addr, reg, value))
-		{
-			// operation failed
-			*value = 0xff;
-			return error;
-		}
-		else
-		{
-			// operation successful
-			return SUCCESS;
-		}
+		return hal_getDeviceRegister(addr, reg, value);
 	}
 }
 
@@ -204,33 +193,14 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count)
 {
 	int error;
-	// invalid address for a device
-	if (addr == 0 || addr > MAX_NUM_DEVICES)
+	if (error = check_params(addr))
 	{
-		buff[0] = 0xff;
-		return INVALID_ADDR;
-	}
-	// valid address, but there is no device on the network at this address
-	else if (!addrIsUsed(addr))
-	{
-		buff[0] = 0xff;
-		return DEVICE_NOT_FOUND;
+		return error;
 	}
 	// valid device
 	else
 	{
-		// call hal to get the value.
-		if (error = hal_getDeviceMultiRegs(addr, reg, buff, count))
-		{
-			// operation failed
-			buff[0] = 0xff;
-			return error;
-		}
-		else
-		{
-			// operation successful
-			return SUCCESS;
-		}
+		return hal_getDeviceMultiRegs(addr, reg, buff, count);
 	}
 }
 
@@ -243,36 +213,86 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
  */
 int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg)
 {
-	// invalid address for a device
-	if (addr == 0 || addr > MAX_NUM_DEVICES)
+	int error;
+	if (error = check_params(addr))
 	{
-		return 1;
+		return error;
 	}
-	// valid address, but device doesn't exist
-	else if (!addrIsUsed(addr))
-	{
-		return 2;
-	}
-	// valid address for a device
 	else
 	{
-		// call hal to set the value to the device.
-		if (hal_setDeviceRegister(addr, reg, value))
-		{
-			// operation failed
-			return 3;
-		}
-		else
-		{
-			// operation successful
-			return SUCCESS;
-		}
+		return hal_setDeviceRegister(addr, reg, value);
 	}
 }
 
 /******************************************************************************
  internal functions ***********************************************************
  *****************************************************************************/
+
+/*
+ * hot_swap_event
+ * successively pings each device and looks for new devices on the network
+ * interrupts the host if a device is missing or if a new device was plugged in
+ */
+void hot_swap_event()
+{
+	static uint16_t curr_device = 0;
+	static uint8_t num_events = 0;
+	// If the initialization hasn't happened yet, don't do this.
+	if (!proj_initialized)
+	{
+		return;
+	}
+	// Every 4th call, check for new devices
+	if ((num_events & 4) == 0)
+	{
+		uint8_t addr;
+		if (addr = find_new_device())
+		{
+			// There's a new device! Interrupt the host with address and type
+			// of new device
+			uint8_t buff[3] =
+			{ INTR_TYPE_NEW_BERRY, addr, myDeviceList.devices[addr].deviceType };
+			interrupt_host(INTR_SRC_MASTER, buff, 3);
+		}
+	}
+	// 3 out of 4 calls, ping a device
+	else
+	{
+		Device_t *device_list = myDeviceList.devices;
+		uint8_t addr;
+		// Grab the next address
+		addr = device_list[curr_device].deviceAddress;
+		// Only ping of address is nonzero and it's not already missing
+		if (addr != 0 && !device_list[curr_device].missing)
+		{
+			// Ping the device, check if it answers back
+			if (hal_pingDevice(addr) != SUCCESS)
+			{
+				// device is missing now, set missing flag and interrupt host
+				device_list[curr_device].missing = 1;
+				// notify host of the missing berry and its address
+				uint8_t buff[2] =
+				{ INTR_TYPE_MISSING_BERRY, addr };
+				interrupt_host(INTR_SRC_MASTER, buff, 2);
+			}
+		}
+		// Next device index
+		++curr_device;
+		if (curr_device > MAX_NUM_DEVICES)
+		{
+			curr_device = 1;
+		}
+	}
+
+	// keep track of how many times this function has been called;
+	// rollover is okay
+	++num_events;
+
+	// debugging - send garbage interrupt to the host
+	//uint8_t buff[2] =
+	//{ 0xFE, 0xED };
+	//interrupt_host(0, buff, 2);
+}
 
 /* clearNetwork
  * resets the device table
@@ -289,6 +309,27 @@ static void clearNetwork()
 	myDeviceList.currNumDevices = 0;
 
 	hal_resetAllDevices();
+}
+
+/* check_params
+ * checks to make sure the address is okay and the device is still there
+ */
+static int check_params(uint8_t addr)
+{
+	// Is it a valid address?
+	if (addr <= 0 || addr > MAX_NUM_DEVICES)
+	{
+		return INVALID_ADDR;
+	}
+	// Is there a device at this address?
+	else if (!addrIsUsed(addr) || myDeviceList.devices[addr].missing)
+	{
+		return DEVICE_NOT_FOUND;
+	}
+	else
+	{
+		return SUCCESS;
+	}
 }
 
 /* validateDeviceList
@@ -343,7 +384,7 @@ static int validateDeviceList()
 	return SUCCESS; // success
 }
 
-/* getNewDevices
+/* find_all_new_devices
  * while(1):
  *   get an available address
  *   call hal_getNewDevice(addr)
@@ -351,7 +392,7 @@ static int validateDeviceList()
  *       initialize that device in the network
  *     else return
  */
-static int getNewDevices()
+static int find_all_new_devices()
 {
 	int error;
 	uint8_t addr;
@@ -385,12 +426,58 @@ static int getNewDevices()
 			// Successfully got the type
 			myDeviceList.devices[addr].deviceType = type;
 
+			// Not missing
+			myDeviceList.devices[addr].missing = 0;
+
 			// Increment number of devices on the network.
 			myDeviceList.currNumDevices++;
 		}
 		else
 			return SUCCESS; // no devices grabbed the address - we're done
 	}
+}
+
+/* find_new_device
+ * Looks for a new device
+ * Returns the address
+ * If the address is 0, then there was no new device
+ */
+static int find_new_device()
+{
+	uint8_t addr, type;
+	addr = findUnusedAddress();
+	if (addr == 0)
+	{
+		return 0;
+	}
+	// Offer a new address to an open device.
+	else if (!(hal_discoverNewDevice(addr)))
+	{
+		// A new device grabbed the requested address!
+		// Record the address of the device.
+		myDeviceList.devices[addr].deviceAddress = addr;
+
+		// Get the type of the device and assign the type
+		if (getDeviceTypeFromHal(addr, &type))
+		{
+			// error - failed to get the type from the device
+			myDeviceList.devices[addr].deviceType = UNKNOWN;
+		}
+		else
+		{
+			// Successfully got the type
+			myDeviceList.devices[addr].deviceType = type;
+		}
+
+		// Not missing
+		myDeviceList.devices[addr].missing = 0;
+
+		// Increment number of devices on the network.
+		myDeviceList.currNumDevices++;
+		return addr;
+	}
+	else
+		return 0; // no new device
 }
 
 /* findUnusedAddress

@@ -35,7 +35,6 @@ volatile uint16_t sys_event; // holds all events
 //Function prototypes
 void events_usb_callback();
 void events_server_callback();
-static void hot_swap_event();
 
 //Init all buffer and slot connections
 void events_init()
@@ -152,14 +151,6 @@ int WDT_init()
 	return 0;
 }
 
-// TODO: move to berry_master.c
-static void hot_swap_event()
-{
-	uint8_t buff[2] =
-	{ 0xFE, 0xED };
-	interrupt_host(0, buff, 2);
-}
-
 //-----------------------------------------------------------------------------
 //	Watchdog Timer ISR
 //
@@ -178,7 +169,7 @@ __interrupt void WDT_ISR(void)
 
 	// Should we check on the berries?
 	--hot_swap_cnt;
-	if (hot_swap_cnt == 0)
+	if (hot_swap_cnt)
 	{
 		hot_swap_cnt = HOT_SWAP_POLL_CNT;
 		sys_event |= HOT_SWAP_EVENT;

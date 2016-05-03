@@ -182,12 +182,11 @@ void rpc_getDeviceValue()
 	READ(reg);
 
 	// Get the value from the device
-	uint8_t value[2];
-	uint8_t result = getDeviceValue(addr, value, reg);
-	value[1] = 0;
+	uint8_t value;
+	uint8_t result = getDeviceValue(addr, &value, reg);
 
 	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH + 1, result, value, 1);
+	setReply(STD_REPLY_LENGTH + 1, result, &value, 1);
 }
 
 void rpc_getDeviceMultiValues()

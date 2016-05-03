@@ -95,6 +95,11 @@ enum SYS_ERRORS
 // Device types
 #define UNKNOWN 0
 
+// Device interrupts
+#define INTR_SRC_MASTER 0
+#define INTR_TYPE_MISSING_BERRY 0
+#define INTR_TYPE_NEW_BERRY 1
+
 // Errors
 #define NETWORK_FULL		255
 #define INVALID_ADDR 		254
@@ -116,6 +121,7 @@ typedef struct Device
 {
 	uint8_t deviceType;
 	uint8_t deviceAddress;
+	uint8_t missing;
 } Device_t;
 
 // Maximum number of devices allowed on the network - limited to 127 because
@@ -201,6 +207,13 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
  * @return 0 if successful; 1 otherwise
  */
 int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg);
+
+/*
+ * hot_swap_event
+ * successively pings each device and looks for new devices on the network
+ * interrupts the host if a device is missing or if a new device was plugged in
+ */
+void hot_swap_event();
 
 /******************************************************************************
  * Other function prototypes **************************************************
