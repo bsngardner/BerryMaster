@@ -5,6 +5,7 @@
  *      Author: Berry_Admin
  */
 
+#include <string.h>
 #include "berryMaster.h"
 #include "hal.h"
 #include "server.h"
@@ -36,10 +37,10 @@ static uint8_t proj_initialized = FALSE;
  */
 static void clearNetwork();
 
-/* check_params
+/* check_addr
  * checks to make sure the address is okay and the device is still there
  */
-static int check_params(uint8_t addr);
+static int check_addr(uint8_t addr);
 
 /* validateDeviceList
  *  pings each device in the list
@@ -150,7 +151,7 @@ int initDevices(uint8_t project_hash)
 int getDeviceType(uint8_t addr, uint8_t* deviceType)
 {
 	int error;
-	if (error = check_params(addr))
+	if (error = check_addr(addr))
 	{
 		*deviceType = UNKNOWN;
 		return error;
@@ -172,7 +173,7 @@ int getDeviceType(uint8_t addr, uint8_t* deviceType)
 int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg)
 {
 	int error;
-	if (error = check_params(addr))
+	if (error = check_addr(addr))
 	{
 		return error;
 	}
@@ -193,7 +194,7 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count)
 {
 	int error;
-	if (error = check_params(addr))
+	if (error = check_addr(addr))
 	{
 		return error;
 	}
@@ -214,7 +215,7 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
 int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg)
 {
 	int error;
-	if (error = check_params(addr))
+	if (error = check_addr(addr))
 	{
 		return error;
 	}
@@ -246,6 +247,7 @@ void hot_swap_event()
 	if ((num_events & 4) == 0)
 	{
 		uint8_t addr;
+		hal_check_proj_hash(fram_proj_hash);
 		if (addr = find_new_device())
 		{
 			// There's a new device! Interrupt the host with address and type
@@ -300,21 +302,15 @@ void hot_swap_event()
  */
 static void clearNetwork()
 {
-	int i;
-	for (i = 0; i < DEVICES_ARRAY_SIZE; i++)
-	{
-		myDeviceList.devices[i].deviceAddress = 0;
-		myDeviceList.devices[i].deviceType = UNKNOWN;
-	}
 	myDeviceList.currNumDevices = 0;
-
+	memset(myDeviceList.devices, 0, sizeof(myDeviceList.devices));
 	hal_resetAllDevices();
 }
 
-/* check_params
+/* check_addr
  * checks to make sure the address is okay and the device is still there
  */
-static int check_params(uint8_t addr)
+static int check_addr(uint8_t addr)
 {
 	// Is it a valid address?
 	if (addr <= 0 || addr > MAX_NUM_DEVICES)

@@ -46,7 +46,6 @@ volatile static I2C_STATUS status = STOP;
 // sets up SDA and SCL, inits eUSCI module, enables interrupt vector
 uint8_t hal_init()
 {
-
 	SET_I2C;
 
 	UCB0CTLW0 |= UCSWRST;                          // put eUSCI_B in reset state
@@ -59,7 +58,6 @@ uint8_t hal_init()
 
 void configure_i2c(uint8_t num_bytes)
 {
-
 	UCB0CTLW0 |= UCSWRST;
 
 	UCB0CTLW0 |= UCTR;
@@ -74,7 +72,6 @@ void configure_i2c(uint8_t num_bytes)
 //	1 if address not accepted
 uint8_t hal_discoverNewDevice(uint8_t new_address)
 {
-
 	UCB0I2CSA = GEN_CALL;
 	txPtr = txData;
 	txPtr[0] = NEW_ADDR_CMD;
@@ -130,7 +127,6 @@ uint8_t hal_resetAllDevices()
 // Sends 0x01 to device address, returns 0 if device ACKed, 1 if NACK
 uint8_t hal_pingDevice(uint8_t address)
 {
-
 	UCB0I2CSA = address;
 	configure_i2c(0);
 	UCB0IE |= UCNACKIE | UCSTPIE; //
@@ -187,7 +183,6 @@ uint8_t hal_check_proj_hash(uint8_t proj_hash)
 //Sets register (reg) on device (@address) to value (value)
 uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg, uint8_t value)
 {
-
 	UCB0I2CSA = address;
 	txPtr = txData;
 	txPtr[0] = reg;
@@ -240,7 +235,6 @@ uint8_t hal_getDeviceRegister(uint8_t address, uint8_t reg, uint8_t* ret)
 uint8_t hal_getDeviceMultiRegs(uint8_t address, uint8_t reg, uint8_t* ret,
 		uint8_t count)
 {
-
 	UCB0I2CSA = address;
 	txPtr = txData;
 	*txPtr = reg;
@@ -300,7 +294,6 @@ uint8_t hal_getDeviceMultiRegs(uint8_t address, uint8_t reg, uint8_t* ret,
 #pragma vector=USCI_B0_VECTOR
 __interrupt void euscib0_isr(void)
 {
-
 	switch (UCB0IV)
 	{
 	case NACK_IV:
