@@ -112,6 +112,7 @@ int disconnectFromMaster()
 int initDevices(uint8_t project_hash)
 {
 	int error;
+	proj_initialized = FALSE;
 	// Init communications over the vine (the HAL)
 	if (error = hal_init())
 		return error;
@@ -264,7 +265,7 @@ void hot_swap_event()
 		uint8_t addr;
 		// Grab the next address
 		addr = device_list[curr_device].deviceAddress;
-		// Only ping of address is nonzero and it's not already missing
+		// Only ping if address is nonzero and it's not already missing
 		if (addr != 0 && !device_list[curr_device].missing)
 		{
 			// Ping the device, check if it answers back
@@ -364,9 +365,10 @@ static int validateDeviceList()
 			{
 				// no device on this address
 				// erase the device from the network list
-				myDeviceList.devices[addr].deviceAddress = 0;
-				myDeviceList.devices[addr].deviceType = UNKNOWN;
-				// one less device on the network
+				Device_t *device = &myDeviceList.devices[addr];
+				device->deviceAddress = 0;
+				device->deviceType = UNKNOWN;
+				device->missing = 0;
 				myDeviceList.currNumDevices--;
 			}
 		}

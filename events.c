@@ -93,13 +93,14 @@ void eventsLoop()
 				server_event();
 			}
 
+			// Verify that berries are still connected and look for new ones
 			else if (sys_event & HOT_SWAP_EVENT)
 			{
 				sys_event &= ~HOT_SWAP_EVENT;
-				hot_swap_event();
+//				hot_swap_event();
 			}
 
-			// Ready to servic a pending request from the host:
+			// We're still alive
 			else if (sys_event & HEARTBEAT_EVENT)
 			{
 				sys_event &= ~HEARTBEAT_EVENT;
