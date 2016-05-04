@@ -24,11 +24,6 @@
  * J.3	O	ASCL	|	2.5			O	RFCS (Radio chip select)
  */
 
-/* TODO's:
- * Server gets info from the IObuffer
- * Dynamically allocate the device table
- */
-
 // Standard includes
 #include <msp430.h>
 #include <stdint.h>
@@ -90,7 +85,7 @@ static int setClock()
 
 	CSCTL0_H = 0x00; // Disable Clock access
 
-	return 0; // success
+	return SUCCESS;
 }
 
 // Initialize ports, timers, clock, etc. for the msp430
@@ -135,6 +130,11 @@ static int msp430init()
 		return err;
 	}
 
+	if (err = timer_init())
+	{ // init interval timer
+		return err;
+	}
+
 	if (err = ft201x_init())
 	{ // init the USB comm chip (ft201x)
 		return err;
@@ -145,7 +145,7 @@ static int msp430init()
 		return err;
 	}
 
-	return 0;
+	return SUCCESS;
 }
 
 // Just spins in an infinite loop

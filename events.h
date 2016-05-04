@@ -26,4 +26,9 @@ void events_init();
  */
 int WDT_init();
 
+/*
+ * Initialize interval timer
+ */
+int timer_init();
+
 #endif /* EVENTS_H_ */

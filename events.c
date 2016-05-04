@@ -97,7 +97,7 @@ void eventsLoop()
 			else if (sys_event & HOT_SWAP_EVENT)
 			{
 				sys_event &= ~HOT_SWAP_EVENT;
-//				hot_swap_event();
+				hot_swap_event();
 			}
 
 			// We're still alive
@@ -151,6 +151,25 @@ int WDT_init()
 	hot_swap_cnt = HOT_SWAP_POLL_CNT;
 	return 0;
 }
+
+int timer_init()
+{
+//	  TA1CCTL0 = CCIE; // TA1CCR0 interrupt enabled
+//	  TA1CCR0 = 60000; // TA1 period in clock cycles, 24MHz / 60KHz =
+//	  	  // 24000 KHz / 60 KHz = 2400/6 = 400 KHz => .0025 ms = 2.5 us
+//	  TA1CTL = TASSEL_2 + MC_1; // SMCLK, upmode
+	return 0;
+}
+
+//-----------------------------------------------------------------------------
+// Timer A0 interrupt service routine
+//
+//__interrupt void Timer_A(void);
+//TIMERA0_ISR(Timer_A)
+//__interrupt void Timer_A(void)
+//{
+//
+//}
 
 //-----------------------------------------------------------------------------
 //	Watchdog Timer ISR

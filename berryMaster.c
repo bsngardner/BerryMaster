@@ -17,8 +17,8 @@
 DeviceList_t myDeviceList =
 { 0 };
 
-#pragma PERSISTENT(fram_proj_hash)
-uint8_t fram_proj_hash = 0;
+#pragma PERSISTENT(fram_proj_key)
+uint8_t fram_proj_key = 0;
 
 static uint8_t proj_initialized = FALSE;
 
@@ -109,7 +109,7 @@ int disconnectFromMaster()
  * discovers new devices and assigns them addresses
  * 	 iterates hal_getNewDevice(newDevAddr)
  */
-int initDevices(uint8_t project_hash)
+int initDevices(uint8_t project_key)
 {
 	int error;
 	proj_initialized = FALSE;
@@ -119,11 +119,11 @@ int initDevices(uint8_t project_hash)
 
 	// If project hash is different, clear the device network and
 	// update the project hash.
-	if (project_hash != fram_proj_hash)
+	if (project_key != fram_proj_key)
 	{
 		clearNetwork();
-		fram_proj_hash = project_hash;
-		hal_check_proj_hash(project_hash);
+		fram_proj_key = project_key;
+		hal_check_proj_hash(project_key);
 
 		// Look for new devices on the network.
 		if (error = find_all_new_devices())
@@ -248,7 +248,7 @@ void hot_swap_event()
 	if ((num_events & 4) == 0)
 	{
 		uint8_t addr;
-		hal_check_proj_hash(fram_proj_hash);
+		hal_check_proj_hash(fram_proj_key);
 		if (addr = find_new_device())
 		{
 			// There's a new device! Interrupt the host with address and type
@@ -265,18 +265,32 @@ void hot_swap_event()
 		uint8_t addr;
 		// Grab the next address
 		addr = device_list[curr_device].deviceAddress;
-		// Only ping if address is nonzero and it's not already missing
-		if (addr != 0 && !device_list[curr_device].missing)
+		// Only ping if address is nonzero (there's actually a berry there)
+		if (addr != 0)
 		{
-			// Ping the device, check if it answers back
+			// Ping the device
 			if (hal_pingDevice(addr) != SUCCESS)
 			{
-				// device is missing now, set missing flag and interrupt host
-				device_list[curr_device].missing = 1;
-				// notify host of the missing berry and its address
-				uint8_t buff[2] =
-				{ INTR_TYPE_MISSING_BERRY, addr };
-				interrupt_host(INTR_SRC_MASTER, buff, 2);
+				// Only interrupt if the device wasn't already missing
+				if (!device_list[curr_device].missing)
+				{
+					// notify host of the missing berry and its address
+					uint8_t buff[2] =
+					{ INTR_TYPE_MISSING_BERRY, addr };
+					interrupt_host(INTR_SRC_MASTER, buff, 2);
+					device_list[curr_device].missing = 1;
+				}
+			}
+			else
+			{
+				// It answered. If it was missing, then notify the host
+				// that it's back again.
+				if (device_list[curr_device].missing)
+				{
+					uint8_t buff[2] = { INTR_TYPE_FOUND_BERRY, addr };
+					interrupt_host(INTR_SRC_MASTER, buff, 2);
+					device_list[curr_device].missing = 0;
+				}
 			}
 		}
 		// Next device index
@@ -344,7 +358,7 @@ static int validateDeviceList()
 
 	// First, send a general call to the berries to make sure they have
 	// the same project hash
-	hal_check_proj_hash(fram_proj_hash);
+	hal_check_proj_hash(fram_proj_key);
 
 	// Second, iterate through the device table and ping each device
 	// i keeps track of how many devices we've checked
@@ -370,6 +384,10 @@ static int validateDeviceList()
 				device->deviceType = UNKNOWN;
 				device->missing = 0;
 				myDeviceList.currNumDevices--;
+			}
+			else
+			{ // make sure that the missing flag is updated in the device table
+				myDeviceList.devices[addr].missing = 0;
 			}
 		}
 		addr++;
