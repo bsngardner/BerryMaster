@@ -4,7 +4,7 @@
  *  Created on: May 20, 2015
  *      Author: Kristian Sims
  */
-
+#include "msp430.h"
 #include <stdlib.h>
 #include "IObuffer.h"
 
@@ -19,6 +19,7 @@ int IOputc(char c, IObuffer* iob)
 
 	// Disable interrupts for interrupt-driven IO
 
+	short sr = __get_SR_register();
 	__disable_interrupt();
 
 	// Get pointer for write location and write to it
@@ -31,10 +32,10 @@ int IOputc(char c, IObuffer* iob)
 
 	// Signal that there are bytes ready (if it was empty)
 	// (check that the callback isn't null. maybe this would be a flag)
-	if (!iob->count++ && iob->bytes_ready)
+	if (!(iob->count++ && iob->callback_once) && iob->bytes_ready)
 		iob->bytes_ready();
 
-	__enable_interrupt();
+	__bis_SR_register(sr & GIE);
 
 	return 0; // success
 }
@@ -56,6 +57,8 @@ int IOnputs(const char* src, int n, IObuffer* iob)
 	int space_left;		// bytes left to EITHER end of buffer or overflow
 	char* write_ptr;		// pointer to which to copy
 
+	short sr = __get_SR_register();
+	__disable_interrupt();
 	// Return error if buffer is null or inactive
 	if (!iob || !iob->size)
 		return -1; // error
@@ -70,7 +73,7 @@ int IOnputs(const char* src, int n, IObuffer* iob)
 	write_ptr = iob->buffer + space_left; //Sneak in init of write pointer
 	space_left = iob->size - space_left;
 
-	iob->count += n;
+	int new_count = iob->count + n;
 
 	//If there is more space than n, skip first loop and write
 	//	n bytes straight through
@@ -84,6 +87,11 @@ int IOnputs(const char* src, int n, IObuffer* iob)
 	while (n-- > 0)
 		*write_ptr++ = *src++;
 
+	if (!iob->count && iob->bytes_ready)
+		iob->bytes_ready();
+	iob->count = new_count;
+
+	__bis_SR_register(sr & GIE);
 	return 0;
 }
 
@@ -130,6 +138,9 @@ int IOgetc(char* cp, IObuffer *iob)
 	if (!iob || !iob->size || !iob->count || !cp)
 		return -1; // error
 
+	short sr = __get_SR_register();
+	__disable_interrupt();
+
 	// Load character where cp points
 	*cp = *(iob->buffer + iob->tail_dex);
 
@@ -138,6 +149,8 @@ int IOgetc(char* cp, IObuffer *iob)
 	if (iob->tail_dex >= iob->size)
 		iob->tail_dex -= iob->size;
 	iob->count--;
+
+	__bis_SR_register(sr & GIE);
 
 	return 0;
 }
@@ -163,6 +176,7 @@ IObuffer* IObuffer_create(int size)
 	iob->count = 0;
 	iob->size = size;
 	iob->bytes_ready = 0;
+	iob->callback_once = 0;
 
 	return iob;
 }
