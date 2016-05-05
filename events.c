@@ -18,15 +18,31 @@
 #include "ft201x.h"
 
 // Macros
-#define WDT_CLKS_PER_SEC	512				// 512 Hz WD clock (@32 kHz)
-#define WDT_CTL				WDT_ADLY_1_9	// 1.95 ms
-#define DEBOUNCE_CNT		80
-#define HOT_SWAP_POLL_CNT	(WDT_CLKS_PER_SEC>>1) // 1/2 second
-#define USB_POLL_CNT		1
 #define MAX_EVENT_ERRORS	10
+#define TIMERA_INTERVAL		32 // @32 kHz, that's ~1ms
+#define HEARTBEAT_CNT		100 // ms
+#define DEBOUNCE_CNT		50 // ms
+#define HOT_SWAP_POLL_CNT	250 // ms
+#define USB_POLL_CNT		1 // ms
+#define SLEEP_MODE			LPM1_bits
+
+// Pet the watchdog:
+// WDTSSEL0 - select ACLK;
+// WDTCNTCL - clear timer
+/* WDTIS (lowest 3 bits):
+ 000b = Watchdog clock source / (2^(31)) (18:12:16 at 32.768 kHz)
+ 001b = Watchdog clock source /(2^(27)) (01:08:16 at 32.768 kHz)
+ 010b = Watchdog clock source /(2^(23)) (00:04:16 at 32.768 kHz)
+ 011b = Watchdog clock source /(2^(19)) (00:00:16 at 32.768 kHz)
+ 100b = Watchdog clock source /(2^(15)) (1 s at 32.768 kHz)
+ 101b = Watchdog clock source / (2^(13)) (250 ms at 32.768 kHz)
+ 110b = Watchdog clock source / (2^(9)) (15.625 ms at 32.768 kHz)
+ 111b = Watchdog clock source / (2^(6)) (1.95 ms at 32.768 kHz)
+ */
+#define PET_WATCHDOG WDTCTL = (WDTPW|WDTSSEL0|WDTCNTCL|WDTIS2_L|WDTIS0_L)
 
 // Global variables
-static volatile int WDT_cps_cnt; // one second counter
+static volatile int heartbeat_cnt; // when 0, trigger heartbeat event
 static volatile int hot_swap_cnt; // when 0, check on the berries
 static volatile int usb_poll_cnt; // when 0, the usb is polled for data
 static volatile int debounceCnt; // debounce counter
@@ -59,13 +75,15 @@ void eventsLoop()
 		if (!sys_event)
 		{
 			// no events pending, enable interrupts and goto sleep (LPM0)
-			__bis_SR_register(LPM0_bits | GIE);
+			__bis_SR_register(SLEEP_MODE | GIE);
 			continue;
 		}
 		else
 		{
 			// At least 1 event is pending
 			__enable_interrupt();
+
+			PET_WATCHDOG; // Pet the watchdog - 250 ms
 
 			// Output is ready to be sent to the host:
 			if (sys_event & USB_O_EVENT)
@@ -143,53 +161,43 @@ void events_server_callback()
 // Initialize the Watchdog Timer
 int WDT_init()
 {
-	WDTCTL = WDT_CTL; // Set Watchdog interval
-	SFRIE1 |= WDTIE; // Enable WDT interrupt
-
-	WDT_cps_cnt = WDT_CLKS_PER_SEC;	// set WD 1 second counter
-	usb_poll_cnt = USB_POLL_CNT;
-	hot_swap_cnt = HOT_SWAP_POLL_CNT;
-	return 0;
+	PET_WATCHDOG;
+	return SUCCESS;
 }
 
 int timer_init()
 {
-//	  TA1CCTL0 = CCIE; // TA1CCR0 interrupt enabled
-//	  TA1CCR0 = 60000; // TA1 period in clock cycles, 24MHz / 60KHz =
-//	  	  // 24000 KHz / 60 KHz = 2400/6 = 400 KHz => .0025 ms = 2.5 us
-//	  TA1CTL = TASSEL_2 + MC_1; // SMCLK, upmode
-	return 0;
+	TA1CCTL0 = CCIE; // TA1CCR0 interrupt enabled
+	TA1CCR0 = 32; // TA1 period in clock cycles, ~32kHz / 32 = 1 kHz => 1 ms
+	TA1CTL = TASSEL_1 + MC_1; // SMCLK, upmode
+
+	heartbeat_cnt = HEARTBEAT_CNT;
+	hot_swap_cnt = HOT_SWAP_POLL_CNT;
+	usb_poll_cnt = USB_POLL_CNT;
+	return SUCCESS;
 }
 
 //-----------------------------------------------------------------------------
 // Timer A0 interrupt service routine
 //
-//__interrupt void Timer_A(void);
-//TIMERA0_ISR(Timer_A)
-//__interrupt void Timer_A(void)
-//{
-//
-//}
-
-//-----------------------------------------------------------------------------
-//	Watchdog Timer ISR
-//
-#pragma vector = WDT_VECTOR
-__interrupt void WDT_ISR(void)
+#pragma vector = TIMER1_A0_VECTOR
+__interrupt void TimerA1_CCR0_ISR(void)
 {
-	// One second elapsed
-	--WDT_cps_cnt;
-	if (WDT_cps_cnt == WDT_CLKS_PER_SEC / 4)
-		LED0_ON; // toggle heartbeat LED
-	if (WDT_cps_cnt == 0)
+	// Heartbeat
+	--heartbeat_cnt;
+	if (heartbeat_cnt == HEARTBEAT_CNT / 4)
 	{
-		WDT_cps_cnt = WDT_CLKS_PER_SEC;
-		sys_event |= HEARTBEAT_EVENT;
+		LED0_ON; // toggle heartbeat LED
+	}
+	if (heartbeat_cnt == 0)
+	{
+		heartbeat_cnt = HEARTBEAT_CNT;
+		sys_event |= HEARTBEAT_EVENT; // trigger heartbeat event
 	}
 
 	// Should we check on the berries?
 	--hot_swap_cnt;
-	if (hot_swap_cnt)
+	if (hot_swap_cnt == 0)
 	{
 		hot_swap_cnt = HOT_SWAP_POLL_CNT;
 		sys_event |= HOT_SWAP_EVENT;
@@ -219,7 +227,7 @@ __interrupt void WDT_ISR(void)
 	// Wake up if a system event is pending
 	if (sys_event)
 	{
-		__bic_SR_register_on_exit(LPM0_bits);
+		__bic_SR_register_on_exit(SLEEP_MODE);
 	}
 }
 
