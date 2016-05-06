@@ -16,14 +16,17 @@
 #include "IObuffer.h"
 #include "server.h"
 #include "ft201x.h"
+#include "nrf.h"
 
 // Macros
 #define MAX_EVENT_ERRORS	10
 #define TIMERA_INTERVAL		32 // @32 kHz, that's ~1ms
-#define HEARTBEAT_CNT		100 // ms
+#define HEARTBEAT_CNT		900 // ms
 #define DEBOUNCE_CNT		50 // ms
 #define HOT_SWAP_POLL_CNT	250 // ms
 #define USB_POLL_CNT		1 // ms
+#define NRF_PING_MAX		16
+#define NRF_PING_MIN		1
 #define SLEEP_MODE			LPM1_bits
 
 // Pet the watchdog:
@@ -39,34 +42,63 @@
  110b = Watchdog clock source / (2^(9)) (15.625 ms at 32.768 kHz)
  111b = Watchdog clock source / (2^(6)) (1.95 ms at 32.768 kHz)
  */
-#define PET_WATCHDOG WDTCTL = (WDTPW|WDTSSEL0|WDTCNTCL|WDTIS2_L|WDTIS0_L)
+#define WDT_15MS (WDTIS2_L | WDTIS1_L | WDTIS0_L)
+#define WDT_250MS (WDTIS2_L | WDTIS0_L)
+#define WDT_1S (WDTIS2_L)
+#define PET_WATCHDOG WDTCTL = (WDTPW | WDTSSEL0 | WDTCNTCL | WDT_1S | WDTHOLD)
+//TODO Reenable watchdog
 
 // Global variables
 static volatile int heartbeat_cnt; // when 0, trigger heartbeat event
 static volatile int hot_swap_cnt; // when 0, check on the berries
-static volatile int usb_poll_cnt; // when 0, the usb is polled for data
+static volatile int usb_poll_cnt = 0; // when 0, the usb is polled for data
+static volatile int nrf_ping_cnt = 0;
+static volatile int nrf_ping_timeout = 0;
 static volatile int debounceCnt; // debounce counter
 volatile uint16_t sys_event; // holds all events
 
 //Function prototypes
 void events_usb_callback();
 void events_server_callback();
+void events_nrf_callback();
+IObuffer* log_slot = 0;
+
+//#define USB_SOURCE
+#define NRF_SOURCE
 
 //Init all buffer and slot connections
 void events_init()
 {
 	server_init();
+
+#ifdef NRF_SOURCE
+	nrf_open(0); //open a a pipe, 0 indicates primary TX device
+	server_slot = nrf_buffer;
+	nrf_slot = server_buffer;
+	log_slot = usb_buffer;
+	//Start ping at high freq, it decays to min freq
+	nrf_ping_cnt = nrf_ping_timeout = NRF_PING_MIN;
+
+#elif USB_SOURCE
 	server_slot = usb_buffer;
 	usb_slot = server_buffer;
+	log_slot = 0;
+	usb_poll_cnt = USB_POLL_CNT;
 
-	ft201x_setUSBCallback(events_usb_callback);
+#else
+	//Bad, no source defined for server
+#endif
+
+	usb_buffer->bytes_ready = events_usb_callback;
 	server_buffer->bytes_ready = events_server_callback;
+	nrf_buffer->bytes_ready = events_nrf_callback;
 }
 
 void eventsLoop()
 {
 	int numEventErrors = 0;
 
+	PET_WATCHDOG; // Pet the watchdog - 250 ms
 	// Wait for an interrupt
 	while (1)
 	{
@@ -109,6 +141,13 @@ void eventsLoop()
 			{
 				sys_event &= ~SERVER_EVENT;
 				server_event();
+			}
+
+			// Radio
+			else if (sys_event & NRF_EVENT)
+			{
+				sys_event &= ~NRF_EVENT;
+				nrf_sendPacket();
 			}
 
 			// Verify that berries are still connected and look for new ones
@@ -155,7 +194,11 @@ void events_usb_callback()
 void events_server_callback()
 {
 	sys_event |= SERVER_EVENT;
-	LED1_ON;
+}
+
+void events_nrf_callback()
+{
+	sys_event |= NRF_EVENT;
 }
 
 // Initialize the Watchdog Timer
@@ -165,27 +208,67 @@ int WDT_init()
 	return SUCCESS;
 }
 
+//accum gate range: -11.72 to 11.72 us
+//Max value: ~30.52 us, round up to 32
+//Mapped range: 16 to 65519
+//Scaling factor: (65519-16)/32e-6
+//Offset: 16 + 11.72us*scaling factor
+#define MAX_POS_SKEW 47992u
+#define ERR_MID_POINT 24004u
+#define NATURAL_ERR 14493u
+#define CORRECTION_ERR 47975u
+#define NATURAL_FREQ 33
+#define CORRECTION_FREQ 32
+
+volatile unsigned int err_accum = 0;
+volatile unsigned long sys_time = 0;
+
 int timer_init()
 {
+	err_accum = ERR_MID_POINT + NATURAL_ERR;
+	TA1CCR0 = NATURAL_FREQ; // TA1 period in clock cycles, ~32kHz / 32 = 1 kHz => 1 ms
+
 	TA1CCTL0 = CCIE; // TA1CCR0 interrupt enabled
-	TA1CCR0 = 32; // TA1 period in clock cycles, ~32kHz / 32 = 1 kHz => 1 ms
-	TA1CTL = TASSEL_1 + MC_1; // SMCLK, upmode
+	TA1CTL = TACLR | TASSEL_1 | MC_2 | TAIE; // ACLK, continuous mode
 
 	heartbeat_cnt = HEARTBEAT_CNT;
 	hot_swap_cnt = HOT_SWAP_POLL_CNT;
-	usb_poll_cnt = USB_POLL_CNT;
 	return SUCCESS;
+}
+
+#pragma vector = TIMER1_A1_VECTOR
+__interrupt void TimerA1_isr(void)
+{
+	__no_operation();
 }
 
 //-----------------------------------------------------------------------------
 // Timer A0 interrupt service routine
 //
 #pragma vector = TIMER1_A0_VECTOR
-__interrupt void TimerA1_CCR0_ISR(void)
+__interrupt void TimerA1_CCR0_isr(void)
 {
+
+	//If accumulated error is greater than the max,
+	// switch to correction freq for one period
+	//This keeps the average time per interrupt within
+	//	the gate range of 1ms, the gate range being +/-12us
+	if (err_accum < MAX_POS_SKEW)
+	{
+		TA1CCR0 += NATURAL_FREQ;
+		err_accum += NATURAL_ERR;
+	}
+	else
+	{
+		TA1CCR0 += CORRECTION_FREQ;
+		err_accum -= CORRECTION_ERR;
+	}
+
+	++sys_time;
+
 	// Heartbeat
 	--heartbeat_cnt;
-	if (heartbeat_cnt == HEARTBEAT_CNT / 4)
+	if (heartbeat_cnt == 450)
 	{
 		LED0_ON; // toggle heartbeat LED
 	}

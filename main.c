@@ -33,6 +33,7 @@
 #include "i2c.h"
 #include "events.h"
 #include "ft201x.h"
+#include "nrf.h"
 
 // Local function prototypes
 static int setClock();
@@ -132,6 +133,12 @@ static int msp430init()
 
 	if (err = timer_init())
 	{ // init interval timer
+		return err;
+	}
+
+	if (err = nrf_init(120, 2))
+	{ //init radio
+	  // (ends with radio powered down, pipe must be opened)
 		return err;
 	}
 

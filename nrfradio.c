@@ -165,11 +165,45 @@ void nrf_close()
 #define MAX_RETRIES 5
 
 #define FIFO_FULL -1
+#define NO_PING -2
+
+static int sendPing()
+{
+	INT_DIS;	//Disable INT interrupt
+	while (spi_reading)
+		;	//Wait until any RX is done
+
+	CSN_EN; //Start radio command
+	rf_status = spi_transfer(RF24_W_TX_PAYLOAD); //CMD to send TX payload
+
+	spi_transfer(0);
+	CSN_DIS; //End radio command
+	--sem_fifo; //Decrement fifo semafore
+
+//If transmitter and fifo has at least 1 packet,
+//	raise CE (or keep raised) to send packets
+//CE will be lowered when a success interrupt is received
+//	and fifo is empty
+	CE_EN;
+	INT_EN; //Reenable interrupt for IRQs
+	return sem_fifo;
+}
 
 int nrf_sendPacket()
 {
 	if (!sem_fifo)
 		return FIFO_FULL;
+
+	if (!nrf_buffer->count)
+	{ //buffer is empty, send ping if tx and fifo empty
+		if (nrf_prx) //PRX, no ping
+			return NO_PING;
+		else if (sem_fifo < 3) //fifo not empty, no ping
+			return NO_PING;
+		else
+			//Send ping
+			return sendPing();
+	}
 
 	INT_DIS;	//Disable INT interrupt
 	while (spi_reading)
@@ -189,18 +223,22 @@ int nrf_sendPacket()
 	else
 		//if primary transmit, load packet as normal
 		rf_status = spi_transfer(RF24_W_TX_PAYLOAD); //CMD to send TX payload
+
 	char data; //Temp variable for reading data from IObuffer
-	//This may look confusing, but we injext another 0 into the packet if the
-	//	first byte is 0 because the first byte will be ignored if it is 0;
+//This may look confusing, but we inject another 0 into the packet if the
+//	first byte is 0 because the first byte will be ignored if it is 0;
 	IOgetc(&data, nrf_buffer);
 	count--;
 	spi_transfer(data);
 	if (!data)
 	{
+		spi_transfer(0);
+		//injected byte takes up 1 from count only if the
+		//	packet is full, otherwise there is room for it.
 		if (count == PAYLOAD_SIZE)
 			count--;
-		spi_transfer(0);
 	}
+
 	while (count-- > 0)
 	{ //Loop to send data to radio over SPI
 		IOgetc(&data, nrf_buffer);
@@ -209,39 +247,15 @@ int nrf_sendPacket()
 	CSN_DIS; //End radio command
 
 	--sem_fifo; //Decrement fifo semafore
-	INT_EN; //Reenable interrupt for IRQs
 
-	//If transmitter and fifo has at least 1 packet,
-	//	raise CE (or keep raised) to send packets
-	//CE will be lowered when a success interrupt is received
-	//	and fifo is empty
+//If transmitter and fifo has at least 1 packet,
+//	raise CE (or keep raised) to send packets
+//CE will be lowered when a success interrupt is received
+//	and fifo is empty
 	if (!nrf_prx && sem_fifo < 3)
 		CE_EN;
+	INT_EN; //Reenable interrupt for IRQs
 	return sem_fifo;
-}
-
-void nrf_sendPing()
-{
-	if (sem_fifo != 3 || nrf_prx)
-		return;
-	INT_DIS;	//Disable INT interrupt
-	while (spi_reading)
-		;	//Wait until any RX is done
-
-	CSN_EN; //Start radio command
-	rf_status = spi_transfer(RF24_W_TX_PAYLOAD); //CMD to send TX payload
-
-	spi_transfer(0);
-	CSN_DIS; //End radio command
-	--sem_fifo; //Decrement fifo semafore
-	INT_EN; //Reenable interrupt for IRQs
-
-	//If transmitter and fifo has at least 1 packet,
-	//	raise CE (or keep raised) to send packets
-	//CE will be lowered when a success interrupt is received
-	//	and fifo is empty
-	if (!nrf_prx && sem_fifo < 3)
-		CE_EN;
 }
 
 void msprf24_close_pipe_all()
@@ -614,7 +628,7 @@ inline void nrf_rx_handle()
 
 	switch (__even_in_range(rx_state, 0x14))
 	{
-	//State when no interrupt is received
+//State when no interrupt is received
 	case IDLE:
 		break;
 

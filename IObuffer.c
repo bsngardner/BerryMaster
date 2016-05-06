@@ -32,7 +32,7 @@ int IOputc(char c, IObuffer* iob)
 
 	// Signal that there are bytes ready (if it was empty)
 	// (check that the callback isn't null. maybe this would be a flag)
-	if (!(iob->count++ && iob->callback_once) && iob->bytes_ready)
+	if (!(iob->count++ && iob->trigger_once) && iob->bytes_ready)
 		iob->bytes_ready();
 
 	__bis_SR_register(sr & GIE);
@@ -87,7 +87,7 @@ int IOnputs(const char* src, int n, IObuffer* iob)
 	while (n-- > 0)
 		*write_ptr++ = *src++;
 
-	if (!iob->count && iob->bytes_ready)
+	if (!(iob->count++ && iob->trigger_once) && iob->bytes_ready)
 		iob->bytes_ready();
 	iob->count = new_count;
 
@@ -176,7 +176,7 @@ IObuffer* IObuffer_create(int size)
 	iob->count = 0;
 	iob->size = size;
 	iob->bytes_ready = 0;
-	iob->callback_once = 0;
+	iob->trigger_once = 1;
 
 	return iob;
 }
