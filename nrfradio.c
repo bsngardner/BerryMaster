@@ -10,6 +10,7 @@
 #include <msp430.h>
 #include "nrf.h"
 #include "nrfradio.h"
+#include "timer.h"
 
 /* Status variable updated every time SPI I/O is performed */
 volatile uint8_t rf_status;
@@ -77,7 +78,7 @@ int nrf_init(int freq, int speed)
 	//port_init();
 	P2DIR |= (RFCS | RFCE);
 	// Wait 100ms for RF transceiver to initialize.
-	__delay_cycles(DELAY_CYCLES_100MS);
+	timer_delay_ms(STARTUP_TIME);
 
 	msprf24_powerdown();
 

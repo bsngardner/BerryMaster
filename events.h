@@ -8,6 +8,8 @@
 #ifndef EVENTS_H_
 #define EVENTS_H_
 
+#include <stdint.h>
+
 // Events
 #define USB_I_EVENT 	0x01
 #define USB_O_EVENT 	0x02
@@ -16,10 +18,13 @@
 #define HOT_SWAP_EVENT	0x40
 #define HEARTBEAT_EVENT 0x80
 
+extern volatile uint16_t sys_event; // holds all events
+
 /*
  * The main loop of the program
  */
 void eventsLoop();
+int events_tick();
 void events_init();
 
 /*

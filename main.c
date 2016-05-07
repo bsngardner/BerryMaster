@@ -48,6 +48,7 @@ extern uint16_t i2c_fSCL; // i2c timing constant
 int main(void)
 {
 	// initialize the board
+	__enable_interrupt();
 	if (msp430init())
 	{
 		// error initializing the board - spin in an idle loop
@@ -57,7 +58,6 @@ int main(void)
 
 	events_init();
 	// Enable global interrupts after all initialization is finished.
-	__enable_interrupt();
 
 	while (1)
 	{
@@ -188,3 +188,12 @@ void handleError()
 	}
 }
 
+#pragma vector=UNMI_VECTOR
+__interrupt void unmi_isr(void)
+{
+	do
+	{
+		SFRIFG1 &= ~OFIFG;                         // Clear OSCFault flag
+		CSCTL5 &= ~XT1OFFG;
+	} while (SFRIFG1 & OFIFG);                   // OSCFault flag still set?
+}

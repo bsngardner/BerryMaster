@@ -21,7 +21,7 @@
 // Macros
 #define MAX_EVENT_ERRORS	10
 #define TIMERA_INTERVAL		32 // @32 kHz, that's ~1ms
-#define HEARTBEAT_CNT		900 // ms
+#define HEARTBEAT_CNT		2 // ms
 #define DEBOUNCE_CNT		50 // ms
 #define HOT_SWAP_POLL_CNT	250 // ms
 #define USB_POLL_CNT		1 // ms
@@ -61,6 +61,7 @@ volatile uint16_t sys_event; // holds all events
 void events_usb_callback();
 void events_server_callback();
 void events_nrf_callback();
+
 IObuffer* log_slot = 0;
 
 //#define USB_SOURCE
@@ -69,6 +70,8 @@ IObuffer* log_slot = 0;
 //Init all buffer and slot connections
 void events_init()
 {
+	heartbeat_cnt = HEARTBEAT_CNT;
+	hot_swap_cnt = HOT_SWAP_POLL_CNT;
 	server_init();
 
 #ifdef NRF_SOURCE
@@ -201,74 +204,11 @@ void events_nrf_callback()
 	sys_event |= NRF_EVENT;
 }
 
-// Initialize the Watchdog Timer
-int WDT_init()
+int events_tick()
 {
-	PET_WATCHDOG;
-	return SUCCESS;
-}
-
-//accum gate range: -11.72 to 11.72 us
-//Max value: ~30.52 us, round up to 32
-//Mapped range: 16 to 65519
-//Scaling factor: (65519-16)/32e-6
-//Offset: 16 + 11.72us*scaling factor
-#define MAX_POS_SKEW 47992u
-#define ERR_MID_POINT 24004u
-#define NATURAL_ERR 14493u
-#define CORRECTION_ERR 47975u
-#define NATURAL_FREQ 33
-#define CORRECTION_FREQ 32
-
-volatile unsigned int err_accum = 0;
-volatile unsigned long sys_time = 0;
-
-int timer_init()
-{
-	err_accum = ERR_MID_POINT + NATURAL_ERR;
-	TA1CCR0 = NATURAL_FREQ; // TA1 period in clock cycles, ~32kHz / 32 = 1 kHz => 1 ms
-
-	TA1CCTL0 = CCIE; // TA1CCR0 interrupt enabled
-	TA1CTL = TACLR | TASSEL_1 | MC_2 | TAIE; // ACLK, continuous mode
-
-	heartbeat_cnt = HEARTBEAT_CNT;
-	hot_swap_cnt = HOT_SWAP_POLL_CNT;
-	return SUCCESS;
-}
-
-#pragma vector = TIMER1_A1_VECTOR
-__interrupt void TimerA1_isr(void)
-{
-	__no_operation();
-}
-
-//-----------------------------------------------------------------------------
-// Timer A0 interrupt service routine
-//
-#pragma vector = TIMER1_A0_VECTOR
-__interrupt void TimerA1_CCR0_isr(void)
-{
-
-	//If accumulated error is greater than the max,
-	// switch to correction freq for one period
-	//This keeps the average time per interrupt within
-	//	the gate range of 1ms, the gate range being +/-12us
-	if (err_accum < MAX_POS_SKEW)
-	{
-		TA1CCR0 += NATURAL_FREQ;
-		err_accum += NATURAL_ERR;
-	}
-	else
-	{
-		TA1CCR0 += CORRECTION_FREQ;
-		err_accum -= CORRECTION_ERR;
-	}
-
-	++sys_time;
-
 	// Heartbeat
 	--heartbeat_cnt;
-	if (heartbeat_cnt == 450)
+	if (heartbeat_cnt == HEARTBEAT_CNT/2)
 	{
 		LED0_ON; // toggle heartbeat LED
 	}
@@ -306,12 +246,14 @@ __interrupt void TimerA1_CCR0_isr(void)
 			LED1_TOGGLE;
 		}
 	}
+	return sys_event;
+}
 
-	// Wake up if a system event is pending
-	if (sys_event)
-	{
-		__bic_SR_register_on_exit(SLEEP_MODE);
-	}
+// Initialize the Watchdog Timer
+int WDT_init()
+{
+	PET_WATCHDOG;
+	return SUCCESS;
 }
 
 //-----------------------------------------------------------------------------
