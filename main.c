@@ -187,13 +187,3 @@ void handleError()
 		LEDS_TOGGLE;
 	}
 }
-
-#pragma vector=UNMI_VECTOR
-__interrupt void unmi_isr(void)
-{
-	do
-	{
-		SFRIFG1 &= ~OFIFG;                         // Clear OSCFault flag
-		CSCTL5 &= ~XT1OFFG;
-	} while (SFRIFG1 & OFIFG);                   // OSCFault flag still set?
-}

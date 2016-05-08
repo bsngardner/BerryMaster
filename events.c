@@ -20,8 +20,7 @@
 
 // Macros
 #define MAX_EVENT_ERRORS	10
-#define TIMERA_INTERVAL		32 // @32 kHz, that's ~1ms
-#define HEARTBEAT_CNT		2 // ms
+#define HEARTBEAT_CNT		1000	 // ms
 #define DEBOUNCE_CNT		50 // ms
 #define HOT_SWAP_POLL_CNT	250 // ms
 #define USB_POLL_CNT		1 // ms
@@ -45,7 +44,7 @@
 #define WDT_15MS (WDTIS2_L | WDTIS1_L | WDTIS0_L)
 #define WDT_250MS (WDTIS2_L | WDTIS0_L)
 #define WDT_1S (WDTIS2_L)
-#define PET_WATCHDOG WDTCTL = (WDTPW | WDTSSEL0 | WDTCNTCL | WDT_1S | WDTHOLD)
+#define PET_WATCHDOG WDTCTL = (WDTPW | WDTSSEL0 | WDTCNTCL | WDT_1S)
 //TODO Reenable watchdog
 
 // Global variables
@@ -208,7 +207,7 @@ int events_tick()
 {
 	// Heartbeat
 	--heartbeat_cnt;
-	if (heartbeat_cnt == HEARTBEAT_CNT/2)
+	if (heartbeat_cnt == HEARTBEAT_CNT / 2)
 	{
 		LED0_ON; // toggle heartbeat LED
 	}

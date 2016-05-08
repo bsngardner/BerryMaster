@@ -73,7 +73,6 @@ enum
 #pragma vector = TIMER1_A1_VECTOR
 __interrupt void TimerA1_isr(void)
 {
-	static int ccr0;
 	switch (__even_in_range(TA1IV, 0x0E))
 	{
 	case TA_NONE:
@@ -91,10 +90,6 @@ __interrupt void TimerA1_isr(void)
 	case TA_CCR6:
 		break;
 	case TA_IFG:
-#ifdef DEBUG
-		ccr0 = (signed int) TA1CCR0;
-		iofprintf(log_slot, "%d, %u\n\r", ccr0, err_accum);
-#endif
 		err_accum = ERR_MID_POINT + NATURAL_ERR;
 		TA1CCR0 = NATURAL_FREQ; // TA1 period in clock cycles, ~32kHz / 32 = 1 kHz => 1 ms
 		break;
@@ -144,4 +139,14 @@ __interrupt void TimerA1_CCR0_isr(void)
 		__bic_SR_register_on_exit(LPM0_bits);
 	}
 
+}
+
+#pragma vector=UNMI_VECTOR
+__interrupt void unmi_isr(void)
+{
+	do
+	{
+		SFRIFG1 &= ~OFIFG;                         // Clear OSCFault flag
+		CSCTL5 &= ~XT1OFFG;
+	} while (SFRIFG1 & OFIFG);                   // OSCFault flag still set?
 }
