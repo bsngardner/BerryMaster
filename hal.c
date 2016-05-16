@@ -24,7 +24,7 @@ static volatile uint8_t * txPtr;
 static volatile uint8_t rxData[16];
 static volatile uint8_t * rxPtr;
 
-static volatile uint8_t vineSleep = 0;
+static volatile uint8_t sleep_flag = 0;
 static volatile uint16_t repeat_start = 0;
 volatile static I2C_STATUS status = STOP;
 
@@ -36,6 +36,7 @@ volatile static I2C_STATUS status = STOP;
 
 #define CLOCK_SPEED 24000000
 #define I2C_SPEED 1000000
+#define STACK_BUF_SIZE 16
 
 //Addresses
 #define GEN_CALL 0x00
@@ -49,9 +50,8 @@ uint8_t hal_init()
 	SET_I2C;
 
 	UCB0CTLW0 |= UCSWRST;                          // put eUSCI_B in reset state
-	UCB0CTLW0 &= ~UCSSEL_2;
-	UCB0CTLW0 |= (UCMODE_3 | UCMST | UCTR | UCSSEL_2); // I2C master mode, SMCLK
-	UCB0BRW = CLOCK_SPEED / I2C_SPEED;        // baudrate = SMCLK /400,000
+	UCB0CTLW0 |= (UCMODE_3 | UCMST | UCTR | UCSSEL_2); // I2C master mode, SMCLK, transmit
+	UCB0BRW = CLOCK_SPEED / I2C_SPEED; // baudrate = SMCLK / (desired i2c speed)
 	UCB0CTLW0 &= ~UCSWRST;                            // clear reset register
 	return 0;
 } //End hal_init()
@@ -68,6 +68,22 @@ void configure_i2c(uint8_t num_bytes)
 	UCB0CTLW0 &= ~UCSWRST;
 }
 
+uint8_t hal_sleep()
+{
+	sleep_flag = 1;
+	while (sleep_flag)
+		LPM0;
+
+	if (status == STOP)
+	{
+		return SUCCESS;
+	}
+	else
+	{
+		return NO_RESPONSE;
+	}
+}
+
 //Sends 0x00 on general call followed by new address.  Returns 0 if address accepted,
 //	1 if address not accepted
 uint8_t hal_discoverNewDevice(uint8_t new_address)
@@ -79,22 +95,10 @@ uint8_t hal_discoverNewDevice(uint8_t new_address)
 	configure_i2c(2);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
 
-	vineSleep = 1;
 	status = DATA;
 	UCB0CTLW0 |= UCTXSTT;
 
-	while (vineSleep)
-		LPM0;
-
-	if (status == STOP)
-	{
-		return ADDR_ACCEPTED;
-	}
-	if (status == NACK)
-	{
-		return ADDR_REJECTED;
-	}
-	return 1;
+	return hal_sleep();
 } //End hal_discoverNewDevice()
 
 uint8_t hal_resetAllDevices()
@@ -106,22 +110,10 @@ uint8_t hal_resetAllDevices()
 	configure_i2c(1);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
 
-	vineSleep = 1;
 	status = DATA;
 	UCB0CTLW0 |= UCTXSTT;
 
-	while (vineSleep)
-		LPM0;
-
-	if (status == STOP)
-	{
-		return ADDR_ACCEPTED;
-	}
-	if (status == NACK)
-	{
-		return ADDR_REJECTED;
-	}
-	return ERROR;
+	return hal_sleep();
 }
 
 // Sends 0x01 to device address, returns 0 if device ACKed, 1 if NACK
@@ -131,25 +123,11 @@ uint8_t hal_pingDevice(uint8_t address)
 	configure_i2c(0);
 	UCB0IE |= UCNACKIE | UCSTPIE; //
 
-	vineSleep = 1;
 	status = DATA;
 	UCB0CTLW0 |= UCTXSTT;
 	UCB0CTLW0 |= UCTXSTP;
 
-	while (vineSleep)
-		LPM0;
-
-	if (status == STOP)
-	{
-		return PING;
-	}
-	if (status == NACK)
-	{
-		return NO_RESPONSE;
-	}
-	__no_operation();
-	//oh no
-	return 2;
+	return hal_sleep();
 
 } //End hal_pingDevice
 
@@ -162,52 +140,43 @@ uint8_t hal_check_proj_hash(uint8_t proj_hash)
 	configure_i2c(2);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
 
-	vineSleep = 1;
 	status = DATA;
 	UCB0CTLW0 |= UCTXSTT;
 
-	while (vineSleep)
-		LPM0;
+	return hal_sleep();
+}
 
-	if (status == STOP)
-	{
-		return 1;
-	}
-	if (status == NACK)
-	{
-		return 2;
-	}
-	return ERROR;
+uint8_t hal_write(uint8_t addr, uint8_t* buf, uint8_t count)
+{
+	UCB0I2CSA = addr;
+	txPtr = buf;
+
+	configure_i2c(count); //Configure to send 2 bytes
+	UCB0IFG = 0; //Clear all interrupt flags
+	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE; //stop, nack, and tx interrupts
+
+	status = DATA;
+	UCB0CTLW0 |= UCTXSTT; //Send i2c start bit
+
+	return hal_sleep();
 }
 
 //Sets register (reg) on device (@address) to value (value)
 uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg, uint8_t value)
 {
-	UCB0I2CSA = address;
-	txPtr = txData;
-	txPtr[0] = reg;
-	txPtr[1] = value;
+	txData[0] = reg;
+	txData[1] = value;
 
-	configure_i2c(2);
-	UCB0IFG = 0;
-	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
+	return hal_write(address, txData, 2);
+}
 
-	vineSleep = 1;
-	status = DATA;
-	UCB0CTLW0 |= UCTXSTT;
-
-	while (vineSleep)
-		LPM0;
-
-	if (status == STOP)
-	{
-		return PING;
-	}
-	if (status == NACK)
-	{
-		return NO_RESPONSE;
-	}
-	return 1;
+uint8_t hal_setDeviceMultiRegs(uint8_t address, uint8_t reg, uint8_t* buf,
+		uint8_t count)
+{
+	uint8_t buffer[STACK_BUF_SIZE];
+	buffer[0] = reg;
+	memcpy(buffer + 1, buf, count);
+	return hal_write(address, buffer, count + 1);
 }
 
 #define DMA_CTL (DMADSTINCR0 | DMADSTINCR1 | DMADSTBYTE | DMASRCBYTE)
@@ -255,22 +224,10 @@ uint8_t hal_getDeviceMultiRegs(uint8_t address, uint8_t reg, uint8_t* ret,
 
 	dma_config(rxPtr, count);
 
-	vineSleep = 1;
 	status = DATA;
 	UCB0CTLW0 |= UCTXSTT;
 
-	while (vineSleep)
-		LPM0;
-
-	if (status == NACK)
-	{
-		return NO_RESPONSE;
-	}
-	if (status == STOP)
-	{
-		return SUCCESS;
-	}
-	return 3;
+	return hal_sleep();
 }
 
 //Defines for all eUSCIB interrupt vectors
@@ -297,38 +254,41 @@ __interrupt void euscib0_isr(void)
 	switch (UCB0IV)
 	{
 	case NACK_IV:
-		UCB0IFG &= ~(UCNACKIFG);
-		UCB0CTLW0 |= UCTXSTP;                  // I2C stop condition.
-		repeat_start = 0;
-		status = NACK;
+		UCB0IFG &= ~(UCNACKIFG); //necessary?  Clear NACK int flag
+		UCB0CTLW0 |= UCTXSTP;    // I2C stop condition.
+		repeat_start = 0;	//make sure flag is cleared for next communication
+		status = NACK;	//target NACK'd, so return that status
 		break;
 	case STP_IV:
 		UCB0IFG &= ~UCSTPIFG;
+		//If a repeat start for a read is needed
 		if (repeat_start)
 		{
-			UCB0CTLW0 |= UCSWRST;
-			UCB0CTLW0 &= ~UCTR;
-			UCB0TBCNT = byte_count;
-			UCB0CTLW0 &= ~UCSWRST;
-			UCB0IE = UCNACKIE | UCSTPIE;
-			//UCB0IE |= UCRXIE0;
-			UCB0CTLW0 |= UCTXSTT;
+			UCB0CTLW0 |= UCSWRST; //Put module in reset
+			UCB0CTLW0 &= ~UCTR;	//Change to read mode
+			UCB0TBCNT = byte_count; //Load byte count into module
+			UCB0CTLW0 &= ~UCSWRST; //end module configuration
+			UCB0IE = UCNACKIE | UCSTPIE; //Enable NACK and STOP interrupts
+			//UCB0IE |= UCRXIE0; //Removed to use dma. Is for fun.
+			UCB0CTLW0 |= UCTXSTT; //Send repeated start bit
 
-			repeat_start = 0;
+			repeat_start = 0; //clear repeat start flag, next time is real stop
 		}
 		else
 		{
+			//There is a stop bit after the NACK, so set
+			//	status to STOP only if status is not NACK
 			if (status != NACK)
 				status = STOP;
-			vineSleep = 0;
-			__bic_SR_register_on_exit(LPM0_bits);
+			sleep_flag = 0; //End vine sleep
+			__bic_SR_register_on_exit(LPM0_bits); //Leave sleep mode
 		}
 		break;
 	case TX0_IV:
-		UCB0TXBUF = *txPtr++;
+		UCB0TXBUF = *txPtr++; //Load module with next byte to be sent
 		break;
 	case RX0_IV:
-		*rxPtr++ = UCB0RXBUF;
+		*rxPtr++ = UCB0RXBUF; //Read byte from module
 		break;
 	default:
 		break;

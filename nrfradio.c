@@ -193,14 +193,14 @@ static int sendPing()
 int nrf_sendPacket()
 {
 	if (!sem_fifo)
-		return FIFO_FULL;
+		return 0;
 
 	if (!nrf_buffer->count)
 	{ //buffer is empty, send ping if tx and fifo empty
 		if (nrf_prx) //PRX, no ping
-			return NO_PING;
+			return sem_fifo;
 		else if (sem_fifo < 3) //fifo not empty, no ping
-			return NO_PING;
+			return sem_fifo;
 		else
 			//Send ping
 			return sendPing();
@@ -675,6 +675,8 @@ inline void nrf_rx_handle()
 		{ //No IRQ source, return to idle
 			spi_reading = 0;
 			rx_state = IDLE;
+			if (!TEST_INT)
+				INT_IFG_EN;
 			INT_EN;
 			if (!nrf_prx)
 			{

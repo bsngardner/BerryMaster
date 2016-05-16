@@ -61,6 +61,7 @@ void spi_int();
 
 #define INT_EN	P1IE |= nrfIRQpin
 #define INT_DIS P1IE &= ~nrfIRQpin
+#define INT_IFG_EN P1IFG |= nrfIRQpin
 #define TEST_INT (P1IN & nrfIRQpin)
 
 #endif /* NRF_H_ */

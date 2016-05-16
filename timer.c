@@ -136,7 +136,7 @@ __interrupt void TimerA1_CCR0_isr(void)
 
 	if (events_tick())
 	{
-		__bic_SR_register_on_exit(LPM0_bits);
+		__bic_SR_register_on_exit(LPM1_bits);
 	}
 
 }
