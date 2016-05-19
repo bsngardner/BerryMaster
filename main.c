@@ -98,10 +98,10 @@ static int msp430init()
 	P1SEL0 = P1SEL1 = 0; // Port 1 is GPIO
 	P1DIR = BCLK; // output pins = 1; input = 0
 	// Init button interrupt on port 1:
-	P1REN = SW1 | USBINT; // enable resistors on switch1 and USBINT
-	P1IE = SW1 | USBINT; // enable interrupt for sw1 and usb
-	P1IES = SW1 | USBINT; // interrupt on falling edge
-	P1OUT = SW1 | INT0 | INT1 | USBINT;
+		P1REN = SW1 | INT0; // enable resistors on switch1
+		P1IE = SW1 | INT0; // enable interrupt for sw1 and usb
+		P1IES = SW1 | INT0; // interrupt on falling edge
+		P1OUT = SW1 | INT0 | INT1;
 
 	// Initialize Port 2
 	P2SEL0 = P2SEL1 = 0; // Port 2 is GPIO
