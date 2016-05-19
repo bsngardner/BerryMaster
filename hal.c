@@ -32,7 +32,8 @@ volatile static I2C_STATUS status = STOP;
 //Commands
 #define NEW_ADDR_CMD 0
 #define RESET_ALL_CMD 1
-#define PROJ_HASH_CMD 2
+#define PROJKEY_VERIFY_CMD 2
+#define PROJKEY_UPDATE_CMD 3
 
 #define CLOCK_SPEED 24000000
 #define I2C_SPEED 1000000
@@ -131,11 +132,26 @@ uint8_t hal_pingDevice(uint8_t address)
 
 } //End hal_pingDevice
 
-uint8_t hal_check_proj_hash(uint8_t proj_hash)
+uint8_t hal_check_proj_key(uint8_t proj_hash)
 {
 	UCB0I2CSA = GEN_CALL;
 	txPtr = txData;
-	txPtr[0] = PROJ_HASH_CMD;
+	txPtr[0] = PROJKEY_VERIFY_CMD;
+	txPtr[1] = proj_hash;
+	configure_i2c(2);
+	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
+
+	status = DATA;
+	UCB0CTLW0 |= UCTXSTT;
+
+	return hal_sleep();
+}
+
+uint8_t hal_update_proj_key(uint8_t proj_hash)
+{
+	UCB0I2CSA = GEN_CALL;
+	txPtr = txData;
+	txPtr[0] = PROJKEY_UPDATE_CMD;
 	txPtr[1] = proj_hash;
 	configure_i2c(2);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;

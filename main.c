@@ -30,7 +30,6 @@
 
 #include "berryMaster.h"
 // Local includes
-#include "i2c.h"
 #include "events.h"
 #include "ft201x.h"
 #include "nrf.h"
@@ -72,7 +71,6 @@ static int setClock()
 	CSCTL1 &= ~(DCORSEL | 0x0006); 	// Clear clock control bits
 	CSCTL3 = 0;						// Clear all dividers
 	CSCTL1 |= DCORSEL | 0x0006; 	// Set clock to 24 MHz
-	i2c_fSCL = (24000 / I2C_FSCL);	// fSCL
 
 	// Initialize the crystal
 	CSCTL4 |= (XT1DRIVE1 | XT1DRIVE0);
@@ -98,10 +96,10 @@ static int msp430init()
 	P1SEL0 = P1SEL1 = 0; // Port 1 is GPIO
 	P1DIR = BCLK; // output pins = 1; input = 0
 	// Init button interrupt on port 1:
-		P1REN = SW1 | INT0; // enable resistors on switch1
-		P1IE = SW1 | INT0; // enable interrupt for sw1 and usb
-		P1IES = SW1 | INT0; // interrupt on falling edge
-		P1OUT = SW1 | INT0 | INT1;
+	P1REN = SW1 | INT0; // enable resistors on switch1
+	P1IE = SW1 | INT0; // enable interrupt for sw1 and usb
+	P1IES = SW1 | INT0; // interrupt on falling edge
+	P1OUT = SW1 | INT0 | INT1;
 
 	// Initialize Port 2
 	P2SEL0 = P2SEL1 = 0; // Port 2 is GPIO
@@ -144,11 +142,6 @@ static int msp430init()
 
 	if (err = ft201x_init())
 	{ // init the USB comm chip (ft201x)
-		return err;
-	}
-
-	if (err = i2c_init())
-	{ // init i2c
 		return err;
 	}
 

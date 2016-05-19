@@ -123,7 +123,7 @@ int initDevices(uint8_t project_key)
 	{
 		clearNetwork();
 		fram_proj_key = project_key;
-		hal_check_proj_hash(project_key);
+		hal_check_proj_key(project_key);
 
 		// Look for new devices on the network.
 		if (error = find_all_new_devices())
@@ -248,7 +248,7 @@ void hot_swap_event()
 	if ((num_events & 4) == 0)
 	{
 		uint8_t addr;
-		hal_check_proj_hash(fram_proj_key);
+		hal_check_proj_key(fram_proj_key);
 		if (addr = find_new_device())
 		{
 			// There's a new device! Interrupt the host with address and type
@@ -287,7 +287,8 @@ void hot_swap_event()
 				// that it's back again.
 				if (device_list[curr_device].missing)
 				{
-					uint8_t buff[2] = { INTR_TYPE_FOUND_BERRY, addr };
+					uint8_t buff[2] =
+					{ INTR_TYPE_FOUND_BERRY, addr };
 					interrupt_host(INTR_SRC_MASTER, buff, 2);
 					device_list[curr_device].missing = 0;
 				}
@@ -358,7 +359,7 @@ static int validateDeviceList()
 
 	// First, send a general call to the berries to make sure they have
 	// the same project hash
-	hal_check_proj_hash(fram_proj_key);
+	hal_check_proj_key(fram_proj_key);
 
 	// Second, iterate through the device table and ping each device
 	// i keeps track of how many devices we've checked
