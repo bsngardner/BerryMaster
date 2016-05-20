@@ -209,8 +209,13 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
  */
 int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg);
 
-/*
- * hot_swap_event
+/* update_proj_key
+ * Updates the project key on the master and on the berries
+ * @param the new project key
+ */
+int update_proj_key(uint16_t new_proj_key);
+
+/* hot_swap_event
  * successively pings each device and looks for new devices on the network
  * interrupts the host if a device is missing or if a new device was plugged in
  */

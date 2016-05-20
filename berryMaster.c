@@ -226,6 +226,22 @@ int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg)
 	}
 }
 
+/* update_proj_key
+ * Updates the project key on the master and on the berries
+ * @param the new project key
+ */
+int update_proj_key(uint16_t new_proj_key)
+{
+	// TODO: make project key 2 bytes instead of 1
+	uint8_t pk = (uint8_t)new_proj_key;
+
+	// update master's project key
+	fram_proj_key = pk;
+
+	// update project key on all berries
+	return hal_update_proj_key(pk);
+}
+
 /******************************************************************************
  internal functions ***********************************************************
  *****************************************************************************/

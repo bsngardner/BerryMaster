@@ -34,6 +34,7 @@ static void rpc_getDeviceType();
 static void rpc_getDeviceValue();
 static void rpc_getDeviceMultiValues();
 static void rpc_setDeviceValue();
+static void rpc_setProjectKey();
 static void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff,
 		uint8_t count);
 
@@ -104,6 +105,10 @@ int server_event()
 	case OP_SET_DEV_VAL:
 		// Set the specified register value in the berry.
 		rpc_setDeviceValue();
+		break;
+	case OP_SET_PROJ_KEY:
+		// Update the project key
+		rpc_setProjectKey();
 		break;
 	default:
 		break;
@@ -241,6 +246,22 @@ void rpc_setDeviceValue()
 	uint8_t result = setDeviceValue(addr, value, reg);
 
 	// Put reply in output buffer.
+	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
+}
+
+static void rpc_setProjectKey()
+{
+	// Get the project key from the message - 2 bytes
+	uint16_t new_proj_key;
+	uint16_t lo, hi;
+	READ(lo);
+	READ(hi);
+	new_proj_key = (hi << 8) | lo;
+
+	// Update the project key
+	uint8_t result = update_proj_key(new_proj_key);
+
+	// Put reply in output buffer
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
 }
 
