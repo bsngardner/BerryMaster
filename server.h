@@ -53,7 +53,8 @@
 #define OP_GET_DEV_VAL  2
 #define OP_SET_DEV_VAL  3
 #define OP_GET_MUL_VALS 4
-#define OP_SET_PROJ_KEY 5
+#define OP_SET_MUL_VALS 5
+#define OP_SET_PROJ_KEY 6
 
 // initializes the server
 void server_init();

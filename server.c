@@ -107,6 +107,10 @@ int server_event()
 		// Set the specified register value in the berry.
 		rpc_setDeviceValue();
 		break;
+	case OP_SET_MUL_VALS:
+		// Set multiple registers in the berry.
+		rpc_setDeviceMultiValues();
+		break;
 	case OP_SET_PROJ_KEY:
 		// Update the project key
 		rpc_setProjectKey();
@@ -260,12 +264,13 @@ void rpc_setDeviceMultiValues()
 	uint8_t reg;
 	READ(reg);
 
-	//Get count of values to set from message
+	// Get count of values to set from message
 	uint8_t count;
 	READ(count);
 
 	// Get the value from the message
 	uint8_t value_buff[25];
+	uint8_t result;
 
 	if (count > 25)
 	{
@@ -273,9 +278,10 @@ void rpc_setDeviceMultiValues()
 	}
 	else
 	{
-		for (int i = 0; i < count; i++)
+		int i;
+		for (i = 0; i < count; i++)
 			READ(value_buff[i]);
-		result = setDeviceMultiValues(addr, reg, buff, count);
+		result = setDeviceMultiValues(addr, reg, value_buff, count);
 	}
 
 	// Put reply in output buffer.

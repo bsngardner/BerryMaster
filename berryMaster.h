@@ -218,7 +218,7 @@ int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg);
  * @return SUCCESS if successful, non-zero if failed
  */
 int setDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
-		uint8_t count)
+		uint8_t count);
 
 /* update_proj_key
  * Updates the project key on the master and on the berries
