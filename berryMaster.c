@@ -226,6 +226,28 @@ int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg)
 	}
 }
 
+/* setDeviceValue
+ * sets the device's value to the specified value
+ * @param the address of the device
+ * @param the register to write
+ * @param the buffer pointer to values
+ * @param count - number of values to write out from buffer
+ * @return SUCCESS if successful, non-zero if failed
+ */
+int setDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
+		uint8_t count)
+{
+	int error;
+	if (error = check_addr(addr))
+	{
+		return error;
+	}
+	else
+	{
+		return hal_setDeviceMultiRegs(addr, reg, buff, count);
+	}
+}
+
 /* update_proj_key
  * Updates the project key on the master and on the berries
  * @param the new project key
@@ -233,7 +255,7 @@ int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg)
 int update_proj_key(uint16_t new_proj_key)
 {
 	// TODO: make project key 2 bytes instead of 1
-	uint8_t pk = (uint8_t)new_proj_key;
+	uint8_t pk = (uint8_t) new_proj_key;
 
 	// update master's project key
 	fram_proj_key = pk;

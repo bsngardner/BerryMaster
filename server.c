@@ -34,6 +34,7 @@ static void rpc_getDeviceType();
 static void rpc_getDeviceValue();
 static void rpc_getDeviceMultiValues();
 static void rpc_setDeviceValue();
+static void rpc_setDeviceMultiValues();
 static void rpc_setProjectKey();
 static void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff,
 		uint8_t count);
@@ -249,6 +250,38 @@ void rpc_setDeviceValue()
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
 }
 
+void rpc_setDeviceMultiValues()
+{
+	// Get the address from the message
+	uint8_t addr;
+	READ(addr);
+
+	// Get the register from the message
+	uint8_t reg;
+	READ(reg);
+
+	//Get count of values to set from message
+	uint8_t count;
+	READ(count);
+
+	// Get the value from the message
+	uint8_t value_buff[25];
+
+	if (count > 25)
+	{
+		result = READ_BYTES_LENGTH_EXCEEDED; // return error
+	}
+	else
+	{
+		for (int i = 0; i < count; i++)
+			READ(value_buff[i]);
+		result = setDeviceMultiValues(addr, reg, buff, count);
+	}
+
+	// Put reply in output buffer.
+	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
+}
+
 static void rpc_setProjectKey()
 {
 	// Get the project key from the message - 2 bytes
@@ -292,7 +325,7 @@ void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff, uint8_t count)
  */
 void interrupt_host(uint8_t intr_source, uint8_t *buff, uint8_t count)
 {
-	WRITE(count+2); // length = count + 1 (MSG_INT) + 1 (intr source)
+	WRITE(count + 2); // length = count + 1 (MSG_INT) + 1 (intr source)
 	WRITE(MSG_INTERRUPT); // msg type
 	WRITE(intr_source); // interrupt source (0 for master, nonzero for berry)
 
