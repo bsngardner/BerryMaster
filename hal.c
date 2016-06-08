@@ -132,13 +132,17 @@ uint8_t hal_pingDevice(uint8_t address)
 
 } //End hal_pingDevice
 
-uint8_t hal_check_proj_key(uint8_t proj_hash)
+// Validates project key on all devices; if any device has a project key that
+// doesn't match, it updates the project key and clears its address so it can
+// be found through discoverNewDevice
+uint8_t hal_check_proj_key(uint16_t proj_key)
 {
 	UCB0I2CSA = GEN_CALL;
 	txPtr = txData;
 	txPtr[0] = PROJKEY_VERIFY_CMD;
-	txPtr[1] = proj_hash;
-	configure_i2c(2);
+	txPtr[1] = (uint8_t)(proj_key & 0xff);
+	txPtr[2] = (uint8_t)((proj_key >> 8) & 0xff);
+	configure_i2c(3);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
 
 	status = DATA;
@@ -147,13 +151,15 @@ uint8_t hal_check_proj_key(uint8_t proj_hash)
 	return hal_sleep();
 }
 
-uint8_t hal_update_proj_key(uint8_t proj_hash)
+// Updates the project key on all the berries WITHOUT changing their addresses
+uint8_t hal_update_proj_key(uint16_t proj_key)
 {
 	UCB0I2CSA = GEN_CALL;
 	txPtr = txData;
 	txPtr[0] = PROJKEY_UPDATE_CMD;
-	txPtr[1] = proj_hash;
-	configure_i2c(2);
+	txPtr[1] = (uint8_t)(proj_key & 0xff);
+	txPtr[2] = (uint8_t)((proj_key >> 8) & 0xff);
+	configure_i2c(3);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
 
 	status = DATA;
@@ -162,6 +168,7 @@ uint8_t hal_update_proj_key(uint8_t proj_hash)
 	return hal_sleep();
 }
 
+// Writes count bytes of the data buf to the berry with address addr
 uint8_t hal_write(uint8_t addr, uint8_t* buf, uint8_t count)
 {
 	UCB0I2CSA = addr;

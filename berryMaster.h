@@ -170,7 +170,7 @@ int disconnectFromMaster();
  * discovers new devices and assigns them addresses
  * 	 iterates hal_getNewDevice(newDevAddr)
  */
-int initDevices(uint8_t project_hash);
+int initDevices(uint16_t project_hash);
 
 /* getDeviceType
  * @param the address of the device

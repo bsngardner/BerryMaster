@@ -154,11 +154,14 @@ int isValidMessage()
 void rpc_initDevices()
 {
 	// Get the project has from the message
-	uint8_t project_hash;
-	READ(project_hash);
+	uint16_t project_key;
+	uint8_t lo, hi;
+	READ(lo);
+	READ(hi);
+	project_key = lo | (hi << 8);
 
 	// Call init devices
-	uint8_t result = initDevices(project_hash);
+	uint8_t result = initDevices(project_key);
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);

@@ -18,7 +18,7 @@ DeviceList_t myDeviceList =
 { 0 };
 
 #pragma PERSISTENT(fram_proj_key)
-uint8_t fram_proj_key = 0;
+uint16_t fram_proj_key = 0;
 
 static uint8_t proj_initialized = FALSE;
 
@@ -109,7 +109,7 @@ int disconnectFromMaster()
  * discovers new devices and assigns them addresses
  * 	 iterates hal_getNewDevice(newDevAddr)
  */
-int initDevices(uint8_t project_key)
+int initDevices(uint16_t project_key)
 {
 	int error;
 	proj_initialized = FALSE;
@@ -249,19 +249,17 @@ int setDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
 }
 
 /* update_proj_key
- * Updates the project key on the master and on the berries
+ * Updates the project key on the master and on the berries without changing
+ * their addresses
  * @param the new project key
  */
 int update_proj_key(uint16_t new_proj_key)
 {
-	// TODO: make project key 2 bytes instead of 1
-	uint8_t pk = (uint8_t) new_proj_key;
-
 	// update master's project key
-	fram_proj_key = pk;
+	fram_proj_key = new_proj_key;
 
 	// update project key on all berries
-	return hal_update_proj_key(pk);
+	return hal_update_proj_key(new_proj_key);
 }
 
 /******************************************************************************

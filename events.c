@@ -22,7 +22,7 @@
 #define MAX_EVENT_ERRORS	10
 #define HEARTBEAT_CNT		1000	 // ms
 #define DEBOUNCE_CNT		50 // ms
-#define HOT_SWAP_POLL_CNT	250 // ms
+#define HOT_SWAP_POLL_CNT	100 // ms
 #define USB_POLL_CNT		16 // ms
 #define USB_ACTIVE			((PJIN & ASDA) && (PJIN & ASCL))
 #define NRF_PING_MAX		16
