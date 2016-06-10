@@ -346,6 +346,27 @@ void hot_swap_event()
 	//uint8_t buff[2] =
 	//{ 0xFE, 0xED };
 	//interrupt_host(0, buff, 2);
+
+	// debugging
+	if (num_events & 4)
+	{
+		// search for the switch berry - get its address
+		int i;
+		uint8_t addr = 0;
+		for (i = 0; i < DEVICES_ARRAY_SIZE; i++)
+		{
+			if (myDeviceList.devices[i].deviceType == 6)
+			{
+				addr = myDeviceList.devices[i].deviceAddress;
+				break;
+			}
+		}
+		if (addr)
+		{
+			// send interrupt to the host pretending the switch berry was pressed
+			interrupt_host(addr, 0, 0);
+		}
+	}
 }
 
 /* clearNetwork

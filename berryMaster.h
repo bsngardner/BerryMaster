@@ -16,6 +16,7 @@
 // Hardware version
 #define MAMA_REV_A
 
+#ifdef MAMA_REV_A
 /*
  * Pinout:
  * Pin#	Dir	Part		Pin#		Dir	Part
@@ -70,6 +71,7 @@
 #define RFCS 0x20 // radio chip select
 #define RFCE 0x40 // radio chip enable
 // pin 2.7 (0x80) not on chip
+#endif
 
 // System errors
 enum SYS_ERRORS

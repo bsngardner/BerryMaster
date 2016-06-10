@@ -49,7 +49,6 @@
 #define WDT_1S (WDTIS2_L)
 #define WDT_16S (WDTIS1_L | WDTIS0_L)
 #define PET_WATCHDOG WDTCTL = (WDTPW | WDTSSEL0 | WDTCNTCL | WDT_16S)
-//TODO Reenable watchdog
 
 // Global variables
 static volatile int heartbeat_cnt; // when 0, trigger heartbeat event
@@ -113,8 +112,6 @@ void events_init()
 
 void eventsLoop()
 {
-	int numEventErrors = 0;
-
 	// Wait for an interrupt
 	while (1)
 	{
@@ -186,20 +183,7 @@ void eventsLoop()
 		// Error - Unrecognized event.
 		else
 		{
-			// TODO: do this right.
-			//reportError("UnrecognizedEvent", SYS_ERR_EVENT, io_usb_out);
-
-			// Clear all pending events -
-			// attempt to let the system correct itself.
-			sys_event = 0;
-
-			// If the number of event errors reaches a predefined value,
-			// stop the program
-			numEventErrors++;
-			if (numEventErrors >= MAX_EVENT_ERRORS)
-			{
-				handleError();
-			}
+			// TODO: ???
 		}
 	}
 }
@@ -248,7 +232,7 @@ int events_tick()
 		sys_event |= HEARTBEAT_EVENT; // trigger heartbeat event
 	}
 
-// Should we check on the berries?
+	// Should we check on the berries?
 	--hot_swap_cnt;
 	if (hot_swap_cnt == 0)
 	{
