@@ -87,7 +87,7 @@ static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value);
  * here for the sake of portability of host code
  * just returns 0 for success
  */
-int connectToMaster()
+int connect_to_master()
 {
 	return SUCCESS;
 }
@@ -96,7 +96,7 @@ int connectToMaster()
  * here for the sake of portability of host code
  * just returns 0 for success
  */
-int disconnectFromMaster()
+int disconnect_from_master()
 {
 	return SUCCESS;
 }
@@ -109,7 +109,7 @@ int disconnectFromMaster()
  * discovers new devices and assigns them addresses
  * 	 iterates hal_getNewDevice(newDevAddr)
  */
-int initDevices(uint16_t project_key)
+int init_devices(uint16_t project_key)
 {
 	int error;
 	proj_initialized = FALSE;
@@ -130,7 +130,6 @@ int initDevices(uint16_t project_key)
 			return error;
 	}
 	// Project key is the same. Check to see if the devices are still there.
-	// If not, then return an error.
 	else
 	{
 		// Validate the device list we have.
@@ -149,7 +148,7 @@ int initDevices(uint16_t project_key)
  * 	       unknown (0) if device is not on network
  * @return SUCCESS for success; 1 if the device is not on the network.
  */
-int getDeviceType(uint8_t addr, uint8_t* deviceType)
+int get_device_type(uint8_t addr, uint8_t* deviceType)
 {
 	int error;
 	if (error = check_addr(addr))
@@ -171,7 +170,7 @@ int getDeviceType(uint8_t addr, uint8_t* deviceType)
  * @param the register to read
  * @return SUCCESS if successful, non-zero if failed
  */
-int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg)
+int get_device_value(uint8_t addr, uint8_t* value, uint8_t reg)
 {
 	int error;
 	if (error = check_addr(addr))
@@ -191,7 +190,7 @@ int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg)
  * @param ret_val - pointer to store the value
  * @param count - number of bytes to read
  */
-int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
+int get_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count)
 {
 	int error;
@@ -213,7 +212,7 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
  * @param the register to write
  * @return SUCCESS if successful, non-zero if failed
  */
-int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg)
+int set_device_value(uint8_t addr, uint8_t value, uint8_t reg)
 {
 	int error;
 	if (error = check_addr(addr))
@@ -234,7 +233,7 @@ int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg)
  * @param count - number of values to write out from buffer
  * @return SUCCESS if successful, non-zero if failed
  */
-int setDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
+int set_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count)
 {
 	int error;
@@ -578,6 +577,6 @@ static uint8_t findUnusedAddress()
 static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value)
 {
 #define REG_TYPE 0
-	return getDeviceValue(addr, value, REG_TYPE);
+	return get_device_value(addr, value, REG_TYPE);
 }
 

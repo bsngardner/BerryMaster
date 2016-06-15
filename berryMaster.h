@@ -156,13 +156,13 @@ typedef struct DeviceList
  * here for the sake of portability of host code
  * just returns 0 for success
  */
-int connectToMaster();
+int connect_to_master();
 
 /* disconnectFromMaster
  * here for the sake of portability of host code
  * just returns 0 for success
  */
-int disconnectFromMaster();
+int disconnect_from_master();
 
 /* init
  * project_hash - the hash of the project
@@ -172,7 +172,7 @@ int disconnectFromMaster();
  * discovers new devices and assigns them addresses
  * 	 iterates hal_getNewDevice(newDevAddr)
  */
-int initDevices(uint16_t project_hash);
+int init_devices(uint16_t project_key);
 
 /* getDeviceType
  * @param the address of the device
@@ -180,7 +180,7 @@ int initDevices(uint16_t project_hash);
  * 	       unknown (0) if device is not on network
  * @return 0 for success; 1 if the device is not on the network.
  */
-int getDeviceType(uint8_t addr, uint8_t* deviceType);
+int get_device_type(uint8_t addr, uint8_t* deviceType);
 
 /* getDeviceValue
  * gets a value in the specified register of the device at the specified address
@@ -189,7 +189,7 @@ int getDeviceType(uint8_t addr, uint8_t* deviceType);
  * @param the register to read
  * @return SUCCESS if successful, non-zero if failed
  */
-int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg);
+int get_device_value(uint8_t addr, uint8_t* value, uint8_t reg);
 
 /* getDeviceMultiValues
  * gets multiple bytes from the requested berry
@@ -199,7 +199,7 @@ int getDeviceValue(uint8_t addr, uint8_t* value, uint8_t reg);
  * @param count - number of bytes to read
  * @return 0 for success; nonzero if failed
  */
-int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
+int get_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count);
 
 /* setDeviceValue
@@ -209,7 +209,7 @@ int getDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
  * @param the register to write
  * @return 0 if successful; 1 otherwise
  */
-int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg);
+int set_device_value(uint8_t addr, uint8_t value, uint8_t reg);
 
 /* setDeviceValue
  * sets the device's value to the specified value
@@ -219,7 +219,7 @@ int setDeviceValue(uint8_t addr, uint8_t value, uint8_t reg);
  * @param count - number of values to write out from buffer
  * @return SUCCESS if successful, non-zero if failed
  */
-int setDeviceMultiValues(uint8_t addr, uint8_t reg, uint8_t* buff,
+int set_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count);
 
 /* update_proj_key

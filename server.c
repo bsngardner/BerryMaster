@@ -161,7 +161,7 @@ void rpc_initDevices()
 	project_key = lo | (hi << 8);
 
 	// Call init devices
-	uint8_t result = initDevices(project_key);
+	uint8_t result = init_devices(project_key);
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
@@ -178,7 +178,7 @@ void rpc_getDeviceType()
 
 	// Get the type of the berry
 	uint8_t type;
-	uint8_t result = getDeviceType(addr, &type);
+	uint8_t result = get_device_type(addr, &type);
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH + 1, result, &type, 1);
@@ -196,7 +196,7 @@ void rpc_getDeviceValue()
 
 	// Get the value from the device
 	uint8_t value;
-	uint8_t result = getDeviceValue(addr, &value, reg);
+	uint8_t result = get_device_value(addr, &value, reg);
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH + 1, result, &value, 1);
@@ -228,7 +228,7 @@ void rpc_getDeviceMultiValues()
 	}
 	else
 	{
-		result = getDeviceMultiValues(addr, reg, buff, count);
+		result = get_device_multi_values(addr, reg, buff, count);
 		buff[count] = 0;
 	}
 
@@ -251,7 +251,7 @@ void rpc_setDeviceValue()
 	READ(value);
 
 	// Set the value in the device
-	uint8_t result = setDeviceValue(addr, value, reg);
+	uint8_t result = set_device_value(addr, value, reg);
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
@@ -284,7 +284,7 @@ void rpc_setDeviceMultiValues()
 		int i;
 		for (i = 0; i < count; i++)
 			READ(value_buff[i]);
-		result = setDeviceMultiValues(addr, reg, value_buff, count);
+		result = set_device_multi_values(addr, reg, value_buff, count);
 	}
 
 	// Put reply in output buffer.
