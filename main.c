@@ -28,8 +28,8 @@
 #include <msp430.h>
 #include <stdint.h>
 
-#include "berryMaster.h"
 // Local includes
+#include "berryMaster.h"
 #include "events.h"
 #include "ft201x.h"
 #include "nrf.h"

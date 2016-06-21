@@ -4,7 +4,7 @@
  * Largely taken from and inspired from:
  * 	http://www.msp430launchpad.com/2012/06/using-printf.html
  *	http://www.43oh.com/forum/viewtopic.php?f=10&t=1732
- * 
+ *
  * See http://www.samlewis.me for an example implementation.
  */
 
@@ -13,7 +13,7 @@
 #include <stdio.h>
 
 #include "ioprintf.h"
-#include "IOBuffer.h"
+#include "IObuffer.h"
 
 // change to zero to disable all printf debug statements
 #define DEBUG 0

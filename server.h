@@ -43,9 +43,11 @@
 #define STD_REPLY_LENGTH 2 // type + result = 2 bytes
 
 // message types
-#define MSG_REPLY 		0xFEu // rpc reply
-#define MSG_INTERRUPT	0xFD // interrupt
-#define MSG_ERROR 		0xFCu // error
+#define MSG_REPLY       254 // rpc reply
+#define MSG_INTERRUPT   253 // interrupt
+#define MSG_ERROR       252 // error
+#define MSG_LOG			251 // log
+#define MSG_WRN			250 // warning
 
 // opcodes
 #define OP_INIT_DEVICES 0

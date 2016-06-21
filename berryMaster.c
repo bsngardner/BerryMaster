@@ -262,7 +262,7 @@ int update_proj_key(uint16_t new_proj_key)
 }
 
 /******************************************************************************
- internal functions ***********************************************************
+ Master functions *************************************************************
  *****************************************************************************/
 
 /*
@@ -347,7 +347,7 @@ void hot_swap_event()
 	//interrupt_host(0, buff, 2);
 
 	// debugging
-	/*
+
 	if (num_events & 4)
 	{
 		// search for the switch berry - get its address
@@ -367,8 +367,42 @@ void hot_swap_event()
 			interrupt_host(addr, 0, 0);
 		}
 	}
-	*/
+	/**/
 }
+
+/* send_log_msg
+ * Sends a null-terminated error, log, or warning message to the host
+ */
+void send_log_msg(char *msg, enum log_type_e log_type)
+{
+	char *ptr = msg;
+	int n = 0;
+	while (*ptr != NULL)
+	{
+		ptr++;
+		n++;
+	}
+	IOputc((char)n+1, log_slot); // length (add one for the type byte)
+	switch(log_type) // type
+	{
+	case error:
+		IOputc((char)MSG_ERROR, log_slot);
+		break;
+	case log:
+		IOputc((char)MSG_LOG, log_slot);
+		break;
+	case warning:
+		/* fall through */
+	default:
+		IOputc((char)MSG_WRN, log_slot);
+		break;
+	}
+	IOnputs(msg, n, log_slot); // message
+}
+
+/******************************************************************************
+ Local helper functions *******************************************************
+ *****************************************************************************/
 
 /* clearNetwork
  * resets the device table

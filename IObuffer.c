@@ -51,9 +51,10 @@ int IOputs(const char* s, IObuffer* iob)
 	return IOnputs(s, n, iob);
 }
 
-//Unfinished, not declared in .h
+// Put n bytes in IObuffer
 int IOnputs(const char* src, int n, IObuffer* iob)
 {
+	int orig_count = n;
 	int space_left;		// bytes left to EITHER end of buffer or overflow
 	char* write_ptr;		// pointer to which to copy
 
@@ -92,7 +93,7 @@ int IOnputs(const char* src, int n, IObuffer* iob)
 	iob->count = new_count;
 
 	__bis_SR_register(sr & GIE);
-	return 0;
+	return orig_count; // number of bytes written
 }
 
 //Unfinished, not declared in .h

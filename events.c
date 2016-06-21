@@ -9,6 +9,7 @@
 
 // Standard includes
 #include <msp430.h>
+#include <stdio.h>
 
 // Local includes
 #include "events.h"
@@ -90,7 +91,7 @@ void events_init()
 #elif defined(USB_SOURCE)
 	server_slot = usb_buffer;
 	usb_slot = server_buffer;
-	log_slot = 0;
+	log_slot = usb_buffer;
 	usb_poll_cnt = USB_POLL_CNT;
 
 #else
@@ -112,6 +113,7 @@ void events_init()
 
 void eventsLoop()
 {
+	char msg[80];
 	// Wait for an interrupt
 	while (1)
 	{
@@ -171,6 +173,13 @@ void eventsLoop()
 		{
 			sys_event &= ~HOT_SWAP_EVENT;
 			hot_swap_event();
+			sprintf(msg, "In Hotswap %d", 32767);
+			send_log_msg(msg, log);
+			int i;
+			for (i = 0; i < 80; i++)
+				msg[i] = 0;
+			sprintf(msg, "2nd in hotswap");
+			send_log_msg(msg, warning);
 		}
 
 		// We're still alive
@@ -178,6 +187,8 @@ void eventsLoop()
 		{
 			sys_event &= ~HEARTBEAT_EVENT;
 			LED0_OFF;
+			sprintf(msg, "In Heartbeat %d", 1234);
+			send_log_msg(msg, error);
 		}
 
 		// Error - Unrecognized event.
