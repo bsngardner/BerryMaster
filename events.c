@@ -175,9 +175,6 @@ void eventsLoop()
 			hot_swap_event();
 			sprintf(msg, "In Hotswap %d", 32767);
 			send_log_msg(msg, log);
-			int i;
-			for (i = 0; i < 80; i++)
-				msg[i] = 0;
 			sprintf(msg, "2nd in hotswap");
 			send_log_msg(msg, warning);
 		}
@@ -187,7 +184,7 @@ void eventsLoop()
 		{
 			sys_event &= ~HEARTBEAT_EVENT;
 			LED0_OFF;
-			sprintf(msg, "In Heartbeat %d", 1234);
+			sprintf(msg, "In Heartbeat %d", 1235);
 			send_log_msg(msg, error);
 		}
 

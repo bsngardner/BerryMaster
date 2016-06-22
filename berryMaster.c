@@ -382,6 +382,7 @@ void send_log_msg(char *msg, enum log_type_e log_type)
 		ptr++;
 		n++;
 	}
+	n++; // add one for null terminating byte
 	IOputc((char)n+1, log_slot); // length (add one for the type byte)
 	switch(log_type) // type
 	{
