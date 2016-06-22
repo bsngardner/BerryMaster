@@ -173,10 +173,10 @@ void eventsLoop()
 		{
 			sys_event &= ~HOT_SWAP_EVENT;
 			hot_swap_event();
-			sprintf(msg, "In Hotswap %d", 32767);
-			send_log_msg(msg, log);
-			sprintf(msg, "2nd in hotswap");
-			send_log_msg(msg, warning);
+//			sprintf(msg, "In Hotswap %d", 32767);
+//			send_log_msg(msg, log);
+//			sprintf(msg, "2nd in hotswap");
+//			send_log_msg(msg, warning);
 		}
 
 		// We're still alive
@@ -184,8 +184,8 @@ void eventsLoop()
 		{
 			sys_event &= ~HEARTBEAT_EVENT;
 			LED0_OFF;
-			sprintf(msg, "In Heartbeat %d", 1235);
-			send_log_msg(msg, error);
+//			sprintf(msg, "In Heartbeat %d", 1235);
+//			send_log_msg(msg, error);
 		}
 
 		// Error - Unrecognized event.

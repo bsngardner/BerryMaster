@@ -347,7 +347,7 @@ void hot_swap_event()
 	//interrupt_host(0, buff, 2);
 
 	// debugging
-
+	/*
 	if (num_events & 4)
 	{
 		// search for the switch berry - get its address
@@ -367,7 +367,7 @@ void hot_swap_event()
 			interrupt_host(addr, 0, 0);
 		}
 	}
-	/**/
+	*/
 }
 
 /* send_log_msg
