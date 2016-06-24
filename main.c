@@ -46,6 +46,7 @@ extern uint16_t i2c_fSCL; // i2c timing constant
  */
 int main(void)
 {
+	WDTCTL = WDTPW | WDTHOLD; // Turn off watchdog
 	// initialize the board
 	__enable_interrupt();
 	if (msp430init())

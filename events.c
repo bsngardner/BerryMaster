@@ -277,7 +277,7 @@ int events_tick()
 // Initialize the Watchdog Timer
 int WDT_init()
 {
-	PET_WATCHDOG;
+	PET_WATCHDOG; // enable watchdog
 	return SUCCESS;
 }
 
