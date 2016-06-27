@@ -23,6 +23,7 @@
 // ----------------------------------------------------------------------------
 IObuffer* server_buffer;
 IObuffer* server_slot;
+uint8_t msg_id;
 
 // ----------------------------------------------------------------------------
 // Function prototypes --------------------------------------------------------
@@ -30,14 +31,11 @@ IObuffer* server_slot;
 
 static int isValidMessage();
 static void rpc_initDevices();
-static void rpc_getDeviceType();
-static void rpc_getDeviceValue();
 static void rpc_getDeviceMultiValues();
-static void rpc_setDeviceValue();
 static void rpc_setDeviceMultiValues();
 static void rpc_setProjectKey();
-static void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff,
-		uint8_t count);
+static void setReply(uint8_t replyLength, uint8_t result,
+		uint8_t* buff, uint8_t count);
 
 //Macros
 #define READ(dest) IOgetc((char*)&(dest), server_buffer)
@@ -84,28 +82,22 @@ int server_event()
 		return error;
 	}
 
+	// get the message id
+	if (error = READ(msg_id))
+	{
+		return error;
+	}
+
 	// handle the request:
 	switch (opcode)
 	{
 	case OP_INIT_DEVICES:
-		// init the network (also sends a reply to the host)
+		// Initialize the network
 		rpc_initDevices();
-		break;
-	case OP_GET_DEV_TYPE:
-		// get the device type (this also sends a reply to the host)
-		rpc_getDeviceType();
-		break;
-	case OP_GET_DEV_VAL:
-		// Get the specified register value in the berry.
-		rpc_getDeviceValue();
 		break;
 	case OP_GET_MUL_VALS:
 		// Get specified register values in the berry.
 		rpc_getDeviceMultiValues();
-		break;
-	case OP_SET_DEV_VAL:
-		// Set the specified register value in the berry.
-		rpc_setDeviceValue();
 		break;
 	case OP_SET_MUL_VALS:
 		// Set multiple registers in the berry.
@@ -153,7 +145,7 @@ int isValidMessage()
  */
 void rpc_initDevices()
 {
-	// Get the project has from the message
+	// Get the project key from the message
 	uint16_t project_key;
 	uint8_t lo, hi;
 	READ(lo);
@@ -165,41 +157,6 @@ void rpc_initDevices()
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
-}
-
-// gets the address from the message
-// calls master getDeviceType
-// and sends reply back to host
-void rpc_getDeviceType()
-{
-	// Get the address from the message
-	uint8_t addr;
-	READ(addr);
-
-	// Get the type of the berry
-	uint8_t type;
-	uint8_t result = get_device_type(addr, &type);
-
-	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH + 1, result, &type, 1);
-}
-
-void rpc_getDeviceValue()
-{
-	// Get the address from the message
-	uint8_t addr;
-	READ(addr);
-
-	// Get the register from the message
-	uint8_t reg;
-	READ(reg);
-
-	// Get the value from the device
-	uint8_t value;
-	uint8_t result = get_device_value(addr, &value, reg);
-
-	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH + 1, result, &value, 1);
 }
 
 void rpc_getDeviceMultiValues()
@@ -234,27 +191,6 @@ void rpc_getDeviceMultiValues()
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH + count, result, buff, count);
-}
-
-void rpc_setDeviceValue()
-{
-	// Get the address from the message
-	uint8_t addr;
-	READ(addr);
-
-	// Get the register from the message
-	uint8_t reg;
-	READ(reg);
-
-	// Get the value from the message
-	uint8_t value;
-	READ(value);
-
-	// Set the value in the device
-	uint8_t result = set_device_value(addr, value, reg);
-
-	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
 }
 
 void rpc_setDeviceMultiValues()
@@ -314,14 +250,17 @@ static void rpc_setProjectKey()
  *
  * Parameters:
  * replyLength - length of the reply
+ * id - the unique reply id
  * result - result of the reply
  * buff - additional data to send to the host
  */
-void setReply(uint8_t replyLength, uint8_t result, uint8_t* buff, uint8_t count)
+void setReply(uint8_t replyLength, uint8_t result,
+		uint8_t* buff, uint8_t count)
 {
-	// Standard reply data: length, type, and result
+	// Standard reply data: length, type, id, and result
 	WRITE(replyLength);
 	WRITE(MSG_REPLY);
+	WRITE(msg_id);
 	WRITE(result);
 
 	if (buff)

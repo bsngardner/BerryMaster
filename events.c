@@ -49,7 +49,7 @@
 #define WDT_250MS (WDTIS2_L | WDTIS0_L)
 #define WDT_1S (WDTIS2_L)
 #define WDT_16S (WDTIS1_L | WDTIS0_L)
-#define PET_WATCHDOG WDTCTL = (WDTPW | WDTSSEL0 | WDTCNTCL | WDT_16S)
+#define PET_WATCHDOG WDTCTL = WDTPW | WDTHOLD//(WDTPW | WDTSSEL0 | WDTCNTCL | WDT_16S)
 
 // Global variables
 static volatile int heartbeat_cnt; // when 0, trigger heartbeat event
@@ -173,10 +173,10 @@ void eventsLoop()
 		{
 			sys_event &= ~HOT_SWAP_EVENT;
 			hot_swap_event();
-//			sprintf(msg, "In Hotswap %d", 32767);
-//			send_log_msg(msg, log);
-//			sprintf(msg, "2nd in hotswap");
-//			send_log_msg(msg, warning);
+			sprintf(msg, "In Hotswap %d", 32767);
+			send_log_msg(msg, log);
+			sprintf(msg, "2nd in hotswap");
+			send_log_msg(msg, warning);
 		}
 
 		// We're still alive
@@ -184,8 +184,8 @@ void eventsLoop()
 		{
 			sys_event &= ~HEARTBEAT_EVENT;
 			LED0_OFF;
-//			sprintf(msg, "In Heartbeat %d", 1235);
-//			send_log_msg(msg, error);
+			sprintf(msg, "In Heartbeat %d", 1235);
+			send_log_msg(msg, error);
 		}
 
 		// Error - Unrecognized event.

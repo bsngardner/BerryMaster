@@ -142,47 +142,6 @@ int init_devices(uint16_t project_key)
 	return SUCCESS; // success
 }
 
-/* getDeviceType
- * @param the address of the device
- * @param a pointer to store the type of the device at the specified address;
- * 	       unknown (0) if device is not on network
- * @return SUCCESS for success; 1 if the device is not on the network.
- */
-int get_device_type(uint8_t addr, uint8_t* deviceType)
-{
-	int error;
-	if (error = check_addr(addr))
-	{
-		*deviceType = UNKNOWN;
-		return error;
-	}
-	else
-	{
-		*deviceType = myDeviceList.devices[addr].deviceType;
-		return SUCCESS;
-	}
-}
-
-/* getDeviceValue
- * gets a value in the specified register of the device at the specified address
- * @param the address of the device
- * @param a pointer to store the value
- * @param the register to read
- * @return SUCCESS if successful, non-zero if failed
- */
-int get_device_value(uint8_t addr, uint8_t* value, uint8_t reg)
-{
-	int error;
-	if (error = check_addr(addr))
-	{
-		return error;
-	}
-	else
-	{
-		return hal_getDeviceRegister(addr, reg, value);
-	}
-}
-
 /* getDeviceMultiValues
  * gets multiple bytes from the requested berry
  * @param address - address of the device
@@ -202,26 +161,6 @@ int get_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 	else
 	{
 		return hal_getDeviceMultiRegs(addr, reg, buff, count);
-	}
-}
-
-/* setDeviceValue
- * sets the device's value to the specified value
- * @param the address of the device
- * @param the value to set
- * @param the register to write
- * @return SUCCESS if successful, non-zero if failed
- */
-int set_device_value(uint8_t addr, uint8_t value, uint8_t reg)
-{
-	int error;
-	if (error = check_addr(addr))
-	{
-		return error;
-	}
-	else
-	{
-		return hal_setDeviceRegister(addr, reg, value);
 	}
 }
 
@@ -614,6 +553,6 @@ static uint8_t findUnusedAddress()
 static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value)
 {
 #define REG_TYPE 0
-	return get_device_value(addr, value, REG_TYPE);
+	return get_device_multi_values(addr, REG_TYPE, value, 1);
 }
 

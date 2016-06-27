@@ -40,7 +40,7 @@
 #define MAX_MSG_LENGTH   32
 
 // length of reply without parameters
-#define STD_REPLY_LENGTH 2 // type + result = 2 bytes
+#define STD_REPLY_LENGTH 3 // msg_type + msg_id + result = 3 bytes
 
 // message types
 #define MSG_REPLY       254 // rpc reply
@@ -51,9 +51,6 @@
 
 // opcodes
 #define OP_INIT_DEVICES 0
-#define OP_GET_DEV_TYPE 1
-#define OP_GET_DEV_VAL  2
-#define OP_SET_DEV_VAL  3
 #define OP_GET_MUL_VALS 4
 #define OP_SET_MUL_VALS 5
 #define OP_SET_PROJ_KEY 6
