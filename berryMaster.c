@@ -286,7 +286,7 @@ void hot_swap_event()
 	//interrupt_host(0, buff, 2);
 
 	// debugging
-	/*
+
 	if (num_events & 4)
 	{
 		// search for the switch berry - get its address
@@ -306,7 +306,7 @@ void hot_swap_event()
 			interrupt_host(addr, 0, 0);
 		}
 	}
-	*/
+
 }
 
 /* send_log_msg
@@ -325,13 +325,13 @@ void send_log_msg(char *msg, enum log_type_e log_type)
 	IOputc((char)n+1, log_slot); // length (add one for the type byte)
 	switch(log_type) // type
 	{
-	case error:
+	case error_msg:
 		IOputc((char)MSG_ERROR, log_slot);
 		break;
-	case log:
+	case log_msg:
 		IOputc((char)MSG_LOG, log_slot);
 		break;
-	case warning:
+	case warning_msg:
 		/* fall through */
 	default:
 		IOputc((char)MSG_WRN, log_slot);

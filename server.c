@@ -72,6 +72,7 @@ int server_event()
 	// get the message:
 	if (error = isValidMessage())
 	{
+		send_log_msg("Error validating message in server event.", error_msg);
 		return error;
 	}
 

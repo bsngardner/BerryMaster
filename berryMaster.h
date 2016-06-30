@@ -206,7 +206,7 @@ int update_proj_key(uint16_t new_proj_key);
  */
 void hot_swap_event();
 
-enum log_type_e { error, log, warning };
+enum log_type_e { error_msg, log_msg, warning_msg };
 /* send_log_msg
  * Sends a null-terminated error, log, or warning message to the host
  */
