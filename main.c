@@ -33,6 +33,7 @@
 #include "events.h"
 #include "ft201x.h"
 #include "nrf.h"
+#include "hal.h"
 
 // Local function prototypes
 static int setClock();
@@ -143,6 +144,11 @@ static int msp430init()
 
 	if (err = ft201x_init())
 	{ // init the USB comm chip (ft201x)
+		return err;
+	}
+
+	if (err = hal_init())
+	{ // init vine communication
 		return err;
 	}
 

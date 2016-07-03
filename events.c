@@ -49,7 +49,7 @@
 #define WDT_250MS (WDTIS2_L | WDTIS0_L)
 #define WDT_1S (WDTIS2_L)
 #define WDT_16S (WDTIS1_L | WDTIS0_L)
-#define PET_WATCHDOG WDTCTL = WDTPW | WDTHOLD//(WDTPW | WDTSSEL0 | WDTCNTCL | WDT_16S)
+#define PET_WATCHDOG (WDTCTL = WDTPW | WDTSSEL0 | WDTCNTCL | WDT_16S)
 
 // Global variables
 static volatile int heartbeat_cnt; // when 0, trigger heartbeat event

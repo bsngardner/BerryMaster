@@ -113,9 +113,6 @@ int init_devices(uint16_t project_key)
 {
 	int error;
 	proj_initialized = FALSE;
-	// Init communications over the vine (the HAL)
-	if (error = hal_init())
-		return error;
 
 	// If project hash is different, clear the device network and
 	// update the project hash.
