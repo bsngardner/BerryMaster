@@ -38,7 +38,7 @@ void addToMessage(char c);
 
 //*****************************************************************************
 //	Define port macros for the current board
-#if defined(MAMA_REV_A)
+#if defined(MASTER_REV_A)
 #define FT201X_I2C_CLOCK_LOW		PJDIR |= ASCL		// put clock low
 #define FT201X_I2C_CLOCK_HIGH		PJDIR &= ~ASCL		// put clock high
 

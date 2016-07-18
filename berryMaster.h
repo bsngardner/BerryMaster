@@ -3,8 +3,6 @@
  *
  *  Created on: Nov 19, 2015
  *   Author(s): Marshall Garey
- *
- * Contains system macros: hardware version, pins, events, errors, IO messages
  */
 
 #ifndef BERRYMASTER_H_
@@ -14,9 +12,9 @@
 #include "IObuffer.h"
 
 // Hardware version
-#define MAMA_REV_A
+#define MASTER_REV_A
 
-#ifdef MAMA_REV_A
+#ifdef MASTER_REV_A
 /*
  * Pinout:
  * Pin#	Dir	Part		Pin#		Dir	Part
@@ -129,7 +127,7 @@ typedef struct Device
 
 // Maximum number of devices allowed on the network - limited to 127 because
 // the vine uses 7 address bits, no device will be allowed to use address 0.
-#define MAX_NUM_DEVICES 10u
+#define MAX_NUM_DEVICES 20u
 #define DEVICES_ARRAY_SIZE (MAX_NUM_DEVICES+1)
 
 /* deviceList
@@ -152,20 +150,8 @@ typedef struct DeviceList
  * master API function prototypes *********************************************
  *****************************************************************************/
 
-/* connectToMaster
- * here for the sake of portability of host code
- * just returns 0 for success
- */
-int connect_to_master();
-
-/* disconnectFromMaster
- * here for the sake of portability of host code
- * just returns 0 for success
- */
-int disconnect_from_master();
-
-/*
- * project_key - the unique identifier for this project
+/* init
+ * project_hash - the hash of the project
  * initializes master:
  * calls hal_initDevices
  * validates current list of berries by pinging each one
@@ -174,29 +160,30 @@ int disconnect_from_master();
  */
 int init_devices(uint16_t project_key);
 
-/*
+/* getDeviceMultiValues
  * gets multiple bytes from the requested berry
  * addr - address of the device
  * reg - the register number where we begin to read
- * buff - pointer of a buffer to store the values
+ * buff - pointer to store the values
  * count - number of bytes to read
  */
 int get_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count);
 
-/*
+/* setDeviceValue
  * sets the device's value to the specified value
  * addr - the address of the device
  * reg - the register to write
  * buff - the buffer pointer to values
  * count - number of values to write out from buffer
+ * return SUCCESS if successful, non-zero if failed
  */
 int set_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count);
 
 /* update_proj_key
- * Updates the project key on the master and on the berries
- * new_proj_key - the new project key
+ * Updates the project key on the master and on the berries without changing
+ * their addresses
  */
 int update_proj_key(uint16_t new_proj_key);
 

@@ -2,13 +2,14 @@
  * BerryMaster.c
  *
  *  Created on: Dec 3, 2015
- *      Author: Berry_Admin
+ *      Author: Marshall Garey
  */
 
 #include <string.h>
 #include "berryMaster.h"
 #include "hal.h"
 #include "server.h"
+#include <stdio.h>
 
 /******************************************************************************
  variables ********************************************************************
@@ -27,8 +28,8 @@ static uint8_t proj_initialized = FALSE;
  *****************************************************************************/
 /* addrIsUsed
  * checks if a device is currently configured at the specified address
- * @param addr the address to check
- * @return 1 if a device is configured at the address; 0 otherwise
+ * addr - the address to check
+ * return 1 if a device is configured at the address; 0 otherwise
  */
 #define addrIsUsed(addr) (myDeviceList.devices[addr].deviceAddress > 0)
 
@@ -45,7 +46,7 @@ static int check_addr(uint8_t addr);
 /* validateDeviceList
  *  pings each device in the list
  *  if the device doesn't respond, take this device out of the list
- * @return SUCCESS if successful, non-zero if failed
+ * return 0 if successful, non-zero if failed
  */
 static int validateDeviceList();
 
@@ -56,7 +57,7 @@ static int validateDeviceList();
  *     if a device grabbed the address (hal_getNewDevice returned true),
  *       initialize that device in the network
  *     else return
- * @return SUCCESS if successful, non-zero if failed
+ * return 0 if successful, non-zero if failed
  */
 static int find_all_new_devices();
 
@@ -68,38 +69,22 @@ static int find_all_new_devices();
 static int find_new_device();
 
 /* findUnusedAddress
- * @return the iterator to an uncofigured device in the list
+ * finds an unused address in the network
+ * return the lowest num unused address in the network;
+ *     0 if there are no open addresses
  */
 static uint8_t findUnusedAddress();
 
-/* getDeviceTypeFromHal(addr)
- * gets the device type from the hal
- * @param addr the address of the device on the network
- * @return type the type of the device;
- *         notADevice if the device is not on the network
+/* getDeviceTypeFromHal
+ * addr - the address of the device on the network
+ * value - store the type here
+ * return 0 on success, nonzero otherwise
  */
 static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value);
 
 /******************************************************************************
  API functions ****************************************************************
  *****************************************************************************/
-/* connectToMaster
- * here for the sake of portability of host code
- * just returns 0 for success
- */
-int connect_to_master()
-{
-	return SUCCESS;
-}
-
-/* disconnectFromMaster
- * here for the sake of portability of host code
- * just returns 0 for success
- */
-int disconnect_from_master()
-{
-	return SUCCESS;
-}
 
 /* init
  * project_hash - the hash of the project
@@ -124,14 +109,24 @@ int init_devices(uint16_t project_key)
 
 		// Look for new devices on the network.
 		if (error = find_all_new_devices())
+		{
+			char msg[40];
+			sprintf(msg, "init_devices err%d", error);
+			send_log_msg(msg, error_msg);
 			return error;
+		}
 	}
 	// Project key is the same. Check to see if the devices are still there.
 	else
 	{
 		// Validate the device list we have.
 		if (error = validateDeviceList())
+		{
+			char msg[40];
+			sprintf(msg, "validateDeviceList err%d", error);
+			send_log_msg(msg, error_msg);
 			return error;
+		}
 	}
 
 	// We're done.
@@ -141,10 +136,10 @@ int init_devices(uint16_t project_key)
 
 /* getDeviceMultiValues
  * gets multiple bytes from the requested berry
- * @param address - address of the device
- * @param reg - the register number where we begin to read
- * @param ret_val - pointer to store the value
- * @param count - number of bytes to read
+ * addr - address of the device
+ * reg - the register number where we begin to read
+ * buff - pointer to store the values
+ * count - number of bytes to read
  */
 int get_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count)
@@ -163,11 +158,11 @@ int get_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 
 /* setDeviceValue
  * sets the device's value to the specified value
- * @param the address of the device
- * @param the register to write
- * @param the buffer pointer to values
- * @param count - number of values to write out from buffer
- * @return SUCCESS if successful, non-zero if failed
+ * addr - the address of the device
+ * reg - the register to write
+ * buff - the buffer pointer to values
+ * count - number of values to write out from buffer
+ * return SUCCESS if successful, non-zero if failed
  */
 int set_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count)
@@ -186,7 +181,6 @@ int set_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 /* update_proj_key
  * Updates the project key on the master and on the berries without changing
  * their addresses
- * @param the new project key
  */
 int update_proj_key(uint16_t new_proj_key)
 {
@@ -349,7 +343,7 @@ static int check_addr(uint8_t addr)
  * iterates through the list of devices
  * if the device was configured (address is not zero), then ping it
  * if it doesn't respond, take it off the network list.
- * @return SUCCESS if successful, non-zero if failed
+ * return 0 if successful, non-zero if failed
  */
 static int validateDeviceList()
 {
@@ -480,6 +474,8 @@ static int find_new_device()
 		{
 			// error - failed to get the type from the device
 			myDeviceList.devices[addr].deviceType = UNKNOWN;
+			send_log_msg("Error in find_new_device - failed to get device "
+					"type", error_msg);
 		}
 		else
 		{
@@ -500,24 +496,24 @@ static int find_new_device()
 
 /* findUnusedAddress
  * finds an unused address in the network
- * @return the lowest num unused address in the network;
+ * return the lowest num unused address in the network;
  *     0 if there are no open addresses
  */
 static uint8_t findUnusedAddress()
 {
 	int i = 1;
 	while (addrIsUsed(i) && i < DEVICES_ARRAY_SIZE)
-		i++;
+		++i;
 	if (i >= DEVICES_ARRAY_SIZE)
 		return 0;
 	else
 		return i;
 }
 
-/* getDeviceTypeFromHal(addr)
- * simply a special case of getDeviceValue - for getting the type
- * @param addr the address of the device on the network
- * @param the variable in which we want to stor the value
+/* getDeviceTypeFromHal
+ * addr - the address of the device on the network
+ * value - store the type here
+ * return 0 on success, nonzero otherwise
  */
 static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value)
 {
