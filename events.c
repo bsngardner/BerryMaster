@@ -152,8 +152,10 @@ void eventsLoop()
 		// Ready to service a pending request from the host:
 		else if (sys_event & SERVER_EVENT)
 		{
-			sys_event &= ~SERVER_EVENT;
 			server_event();
+			// Clear event if there's no pending message
+			if (server_buffer->count == 0)
+				sys_event &= ~SERVER_EVENT;
 		}
 
 		// Radio
