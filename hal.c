@@ -36,7 +36,7 @@ volatile static I2C_STATUS status = STOP;
 #define PROJKEY_UPDATE_CMD 3
 
 #define CLOCK_SPEED 24000000
-#define I2C_SPEED 1000000
+#define I2C_SPEED 2000000
 #define STACK_BUF_SIZE 16
 
 //Addresses

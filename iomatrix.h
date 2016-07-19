@@ -12,10 +12,10 @@
 
 //Size defines
 #ifndef USB_BUF_SIZE
-#define USB_BUF_SIZE 64
+#define USB_BUF_SIZE 256
 #endif
 #ifndef SERVER_BUF_SIZE
-#define SERVER_BUF_SIZE 64
+#define SERVER_BUF_SIZE 256
 #endif
 
 //Buffers

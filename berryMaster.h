@@ -127,7 +127,7 @@ typedef struct Device
 
 // Maximum number of devices allowed on the network - limited to 127 because
 // the vine uses 7 address bits, no device will be allowed to use address 0.
-#define MAX_NUM_DEVICES 20u
+#define MAX_NUM_DEVICES 30u
 #define DEVICES_ARRAY_SIZE (MAX_NUM_DEVICES+1)
 
 /* deviceList

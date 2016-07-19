@@ -195,8 +195,7 @@ void eventsLoop()
 		// Error - Unrecognized event.
 		else
 		{
-			sprintf(msg, "Unrecognized event");
-			send_log_msg(msg, error_msg);
+			send_log_msg("Unrecognized event", error_msg);
 		}
 	}
 }
