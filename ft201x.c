@@ -25,10 +25,6 @@ IObuffer* usb_slot;		// USB to MSP430 buffer
 
 int insertDC(uint16_t event, uint16_t time);
 
-extern volatile uint16_t sys_event;
-extern char sentMessage[MAX_MSG_LENGTH]; // buffer used for the message
-extern volatile int buffLocked;
-
 // local function prototypes
 inline void ft201x_i2c_out_bit(uint8_t bit);
 int ft201x_i2c_out8bits(uint8_t c);

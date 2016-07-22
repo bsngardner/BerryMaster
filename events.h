@@ -15,6 +15,7 @@
 #define USB_O_EVENT 	0x02
 #define SERVER_EVENT 	0x04
 #define NRF_EVENT		0x08
+#define VINE_EVENT		0x10
 #define HOT_SWAP_EVENT	0x40
 #define HEARTBEAT_EVENT 0x80
 
@@ -26,15 +27,6 @@ extern volatile uint16_t sys_event; // holds all events
 void eventsLoop();
 int events_tick();
 void events_init();
-
-/*
- * Initialize the Watchdog Timer
- */
-int WDT_init();
-
-/*
- * Initialize interval timer
- */
 int timer_init();
 
 #endif /* EVENTS_H_ */

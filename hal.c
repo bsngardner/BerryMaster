@@ -36,7 +36,7 @@ volatile static I2C_STATUS status = STOP;
 #define PROJKEY_UPDATE_CMD 3
 
 #define CLOCK_SPEED 24000000
-#define I2C_SPEED 2000000
+#define I2C_SPEED 400000
 #define STACK_BUF_SIZE 16
 
 //Addresses
@@ -245,7 +245,7 @@ uint8_t hal_getDeviceMultiRegs(uint8_t address, uint8_t reg, uint8_t* ret,
 	repeat_start = 1;
 	byte_count = count;
 
-	dma_config(rxPtr, count);
+//	dma_config(rxPtr, count);
 
 	status = DATA;
 	UCB0CTLW0 |= UCTXSTT;
@@ -292,7 +292,7 @@ __interrupt void euscib0_isr(void)
 			UCB0TBCNT = byte_count; //Load byte count into module
 			UCB0CTLW0 &= ~UCSWRST; //end module configuration
 			UCB0IE = UCNACKIE | UCSTPIE; //Enable NACK and STOP interrupts
-			//UCB0IE |= UCRXIE0; //Removed to use dma. Is for fun.
+			UCB0IE |= UCRXIE0; //Removed to use dma. Is for fun.
 			UCB0CTLW0 |= UCTXSTT; //Send repeated start bit
 
 			repeat_start = 0; //clear repeat start flag, next time is real stop

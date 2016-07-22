@@ -36,9 +36,6 @@
 #define OFFSET_RESULT 2
 #define OFFSET_REPLY_PARAMS 3
 
-// maximum length of a message
-#define MAX_MSG_LENGTH   32
-
 // length of reply without parameters
 #define STD_REPLY_LENGTH 3 // msg_type + msg_id + result = 3 bytes
 
@@ -63,10 +60,5 @@ int server_event();
 
 // sends an "interrupt" message to the host
 void interrupt_host(uint8_t intr_source, uint8_t *buff,	uint8_t count);
-
-//IO define
-#ifndef SERVER_BUF_SIZE
-#define SERVER_BUF_SIZE 64;
-#endif
 
 #endif /* SERVER_H_ */

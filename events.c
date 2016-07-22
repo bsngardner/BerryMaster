@@ -57,8 +57,6 @@ static volatile int hot_swap_cnt; // when 0, check on the berries
 static volatile int usb_poll_cnt = 0; // when 0, the usb is polled for data
 static volatile int nrf_ping_cnt = 0;
 static volatile int nrf_ping_timeout = 0;
-static volatile int led_cnt = 0;
-static volatile int debounceCnt; // debounce counter
 volatile uint16_t sys_event; // holds all events
 
 //Function prototypes
@@ -72,6 +70,9 @@ IObuffer* log_slot = 0;
 //#define NRF_SOURCE
 
 //#define DEBOUNCE_SW
+#ifdef DEBOUNCE_SW
+static volatile int debounce_cnt = 0;
+#endif
 
 //Init all buffer and slot connections
 void events_init()
@@ -84,7 +85,7 @@ void events_init()
 	nrf_open(0); //open a a pipe, 0 indicates primary TX device
 	server_slot = nrf_buffer;
 	nrf_slot = server_buffer;
-	log_slot = usb_buffer;
+	log_slot = nrf_buffer;
 	//Start ping at high freq, it decays to min freq
 	nrf_ping_cnt = nrf_ping_timeout = NRF_PING_MIN;
 
@@ -113,7 +114,6 @@ void events_init()
 
 void eventsLoop()
 {
-	char msg[80];
 	// Wait for an interrupt
 	while (1)
 	{
@@ -170,16 +170,18 @@ void eventsLoop()
 				LED1_OFF;
 		}
 
+		// Berry interrupt on the vine
+		else if (sys_event & VINE_EVENT)
+		{
+			sys_event &= ~VINE_EVENT;
+			vine_interrupt_event();
+		}
+
 		// Verify that berries are still connected and look for new ones
 		else if (sys_event & HOT_SWAP_EVENT)
 		{
 			sys_event &= ~HOT_SWAP_EVENT;
 			hot_swap_event();
-			// debugging:
-//			sprintf(msg, "In Hotswap %d", 32767);
-//			send_log_msg(msg, log);
-//			sprintf(msg, "2nd in hotswap");
-//			send_log_msg(msg, warning);
 		}
 
 		// We're still alive
@@ -187,9 +189,6 @@ void eventsLoop()
 		{
 			sys_event &= ~HEARTBEAT_EVENT;
 			LED0_OFF;
-			// debugging:
-//			sprintf(msg, "In Heartbeat %d", 1235);
-//			send_log_msg(msg, error);
 		}
 
 		// Error - Unrecognized event.
@@ -276,13 +275,6 @@ int events_tick()
 #endif
 
 	return sys_event;
-}
-
-// Initialize the Watchdog Timer
-int WDT_init()
-{
-	PET_WATCHDOG; // enable watchdog
-	return SUCCESS;
 }
 
 //-----------------------------------------------------------------------------

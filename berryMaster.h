@@ -51,8 +51,8 @@
 #define LEDS_TOGGLE (PJOUT ^= LED_MASK)
 
 // Port 1
-#define INT0 0x01
-#define INT1 0x02
+#define INT0 0x01 // Radio interrupt
+#define BINT 0x02 // Berry interrupt (on the vine)
 #define BCLK 0x04 // Clock for berry i2c
 #define SW1  0x08 // The button
 #define USBINT 0x10 // ft201x USB interrupt
@@ -102,11 +102,11 @@ enum SYS_ERRORS
 #define INTR_TYPE_FOUND_BERRY 2
 
 // Errors
-#define NETWORK_FULL		255
-#define INVALID_ADDR 		254
-#define DEVICE_NOT_FOUND	253
-#define VALIDATE_LIST_ERR	252
-#define READ_BYTES_LENGTH_EXCEEDED 251
+#define NETWORK_FULL		-1
+#define INVALID_ADDR 		-2
+#define DEVICE_NOT_FOUND	-3
+#define VALIDATE_LIST_ERR	-4
+#define READ_BYTES_LENGTH_EXCEEDED -5
 #define SUCCESS				0
 
 /******************************************************************************
@@ -120,8 +120,7 @@ enum SYS_ERRORS
  */
 typedef struct Device
 {
-	uint8_t deviceType;
-	uint8_t deviceAddress;
+	uint8_t address;
 	uint8_t missing;
 } Device_t;
 
@@ -150,63 +149,17 @@ typedef struct DeviceList
  * master API function prototypes *********************************************
  *****************************************************************************/
 
-/* init
- * project_hash - the hash of the project
- * initializes master:
- * calls hal_initDevices
- * validates current list of berries by pinging each one
- * discovers new devices and assigns them addresses
- * 	 iterates hal_getNewDevice(newDevAddr)
- */
 int init_devices(uint16_t project_key);
-
-/* getDeviceMultiValues
- * gets multiple bytes from the requested berry
- * addr - address of the device
- * reg - the register number where we begin to read
- * buff - pointer to store the values
- * count - number of bytes to read
- */
 int get_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count);
-
-/* setDeviceValue
- * sets the device's value to the specified value
- * addr - the address of the device
- * reg - the register to write
- * buff - the buffer pointer to values
- * count - number of values to write out from buffer
- * return SUCCESS if successful, non-zero if failed
- */
 int set_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
 		uint8_t count);
-
-/* update_proj_key
- * Updates the project key on the master and on the berries without changing
- * their addresses
- */
 int update_proj_key(uint16_t new_proj_key);
-
-/* hot_swap_event
- * successively pings each device and looks for new devices on the network
- * interrupts the host if a device is missing or if a new device was plugged in
- */
+void vine_interrupt_event();
 void hot_swap_event();
 
 enum log_type_e { error_msg, log_msg, warning_msg };
-/* send_log_msg
- * Sends a null-terminated error, log, or warning message to the host
- */
 void send_log_msg(char *msg, enum log_type_e log_type);
 
-
-/******************************************************************************
- * Other function prototypes **************************************************
- *****************************************************************************/
-
-/*
- * spins in an infinite loop, toggling LEDs 0 and 1
- */
-void handleError();
 
 #endif /* BERRYMASTER_H_ */

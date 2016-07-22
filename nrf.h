@@ -43,7 +43,7 @@ void spi_int();
 
 #define STARTUP_TIME 100 //ms
 
-#define NRF_BUF_SIZE 96
+#define NRF_BUF_SIZE 150
 
 /* IRQ */
 #define nrfIRQport 1

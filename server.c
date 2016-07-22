@@ -176,7 +176,7 @@ void rpc_getDeviceMultiValues()
 
 	// Read from the berry
 	uint8_t buff[25];
-	uint8_t result;
+	int8_t result;
 	if (count > 25)
 	{
 		result = READ_BYTES_LENGTH_EXCEEDED; // return error
@@ -210,7 +210,7 @@ void rpc_setDeviceMultiValues()
 
 	// Get the value from the message
 	uint8_t value_buff[25];
-	uint8_t result;
+	int8_t result;
 
 	if (count > 25)
 	{
