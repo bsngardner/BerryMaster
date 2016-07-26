@@ -301,6 +301,9 @@ __interrupt void Port_1_ISR(void)
 	case IV1_0: 	//INT
 		spi_int();
 		break;
+	case IV1_1:
+		sys_event |= VINE_EVENT;
+		break;
 	case IV1_3: //SW1
 #ifdef DEBOUNCE_SW
 	debounceCnt = DEBOUNCE_CNT;

@@ -36,15 +36,44 @@ static void rpc_setDeviceMultiValues();
 static void rpc_setProjectKey();
 static void setReply(uint8_t replyLength, uint8_t result,
 		uint8_t* buff, uint8_t count);
+static void rpc_enableInterrupt();
 
-//Macros
+// ----------------------------------------------------------------------------
+// Macros ---------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 #define READ(dest) IOgetc((char*)&(dest), server_buffer)
 #define WRITE(src) IOputc((char)(src),server_slot);
 #define WRITE_S(src) IOputs((const char*)(src),server_slot)
 #define WRITE_N(src,n) IOnputs((const char*)(src),(n),server_slot)
 
 // ----------------------------------------------------------------------------
-// Functions ------------------------------------------------------------------
+// defined constants ----------------------------------------------------------
+// ----------------------------------------------------------------------------
+
+//	Protocol:
+//  Host->Master:
+//  1 byte|1 byte|1 byte|any length up to MAX_MSG_LENGTH
+//	length|opcode|msg id|parameters...
+//  Notes:
+//    The address will always be the first parameter
+//
+//  Master->Host:
+//  1 byte|1 byte  |1 byte|any length up to MAX_MSG_LENGTH
+//	length|msg type|msg id|parameters...
+
+
+// length of reply without parameters
+#define STD_REPLY_LENGTH 3 // msg_type + msg_id + result = 3 bytes
+
+// opcodes
+#define OP_INIT_DEVICES 0
+#define OP_GET_MUL_VALS 4
+#define OP_SET_MUL_VALS 5
+#define OP_SET_PROJ_KEY 6
+#define OP_EN_INTERRUPT 7
+
+// ----------------------------------------------------------------------------
+// Function definitions -------------------------------------------------------
 // ----------------------------------------------------------------------------
 
 void server_init()
@@ -107,6 +136,10 @@ int server_event()
 	case OP_SET_PROJ_KEY:
 		// Update the project key
 		rpc_setProjectKey();
+		break;
+	case OP_EN_INTERRUPT:
+		// Enable an interrupt on the berry
+		rpc_enableInterrupt();
 		break;
 	default:
 		break;
@@ -244,6 +277,22 @@ static void rpc_setProjectKey()
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
 }
 
+static void rpc_enableInterrupt()
+{
+	uint8_t addr;
+	READ(addr);
+
+	// Interrupt type
+	uint8_t int_type;
+	READ(int_type);
+
+	// Enable the interrupt on the berry
+	uint8_t result = enable_interrupt(addr, int_type);
+
+	// Put reply in output buffer.
+	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
+}
+
 /*
  * Places the reply in the output buffer.
  * A reply packet has the following form:
@@ -271,6 +320,7 @@ void setReply(uint8_t replyLength, uint8_t result,
 
 /*
  * Sends a message to the host of type interrupt
+ * count is the size of buff in bytes
  */
 void interrupt_host(uint8_t intr_source, uint8_t *buff, uint8_t count)
 {

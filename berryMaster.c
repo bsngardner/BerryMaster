@@ -1,15 +1,19 @@
 /*
- * BerryMaster.c
+ * berryMaster.c
  *
  *  Created on: Dec 3, 2015
  *      Author: Marshall Garey
  */
 
+// Standard headers
 #include <string.h>
+#include <stdio.h>
+#include <msp430.h>
+
+// Local headers
 #include "berryMaster.h"
 #include "hal.h"
 #include "server.h"
-#include <stdio.h>
 
 /******************************************************************************
  variables ********************************************************************
@@ -26,54 +30,19 @@ static uint8_t proj_initialized = FALSE;
 /******************************************************************************
  function prototypes and macros ***********************************************
  *****************************************************************************/
-/* addrIsUsed
- * checks if a device is currently configured at the specified address
- * addr - the address to check
- * return 1 if a device is configured at the address; 0 otherwise
- */
+
+// return 1 if a berry has that address
 #define addrIsUsed(addr) (myDeviceList.devices[addr].address > 0)
 
-/* clearNetwork
- * resets device table and all connected devices
- */
-static void clearNetwork();
+#define INT_EN_REG 	-4
+#define INT_REG 	-5
 
-/* check_addr
- * checks to make sure the address is okay and the device is still there
- */
+static void reset_network();
 static int check_addr(uint8_t addr);
-
-/* find_all_new_devices
- * while(1):
- *   get an available address
- *   call hal_getNewDevice(addr)
- *     if a device grabbed the address (hal_getNewDevice returned true),
- *       initialize that device in the network
- *     else return
- * return 0 if successful, non-zero if failed
- */
 static int find_all_new_devices();
-
-/* find_new_device
- * Looks for a new device
- * Returns the address
- * If the address is 0, then there was no new device
- */
 static int find_new_device();
-
-/* findUnusedAddress
- * finds an unused address in the network
- * return the lowest num unused address in the network;
- *     0 if there are no open addresses
- */
 static uint8_t get_available_address();
-
-/* getDeviceTypeFromHal
- * addr - the address of the device on the network
- * value - store the type here
- * return 0 on success, nonzero otherwise
- */
-static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value);
+static inline int get_device_type(uint8_t addr, uint8_t* value);
 
 /******************************************************************************
  API functions ****************************************************************
@@ -91,7 +60,7 @@ int init_devices(uint16_t project_key)
 	// project key
 	if (project_key != fram_proj_key)
 	{
-		clearNetwork();
+		reset_network();
 		fram_proj_key = project_key;
 	}
 
@@ -111,52 +80,35 @@ int init_devices(uint16_t project_key)
 	return SUCCESS; // success
 }
 
-/* getDeviceMultiValues
- * gets multiple bytes from the requested berry
- * addr - address of the device
- * reg - the register number where we begin to read
- * buff - pointer to store the values
- * count - number of bytes to read
+/*
+ * read count bytes from a berry, beginning at register reg
+ * store the read data in buff
  */
-int get_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
+int get_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,
 		uint8_t count)
 {
 	int error;
 	if (error = check_addr(addr))
-	{
 		return error;
-	}
-	// valid device
 	else
-	{
 		return hal_getDeviceMultiRegs(addr, reg, buff, count);
-	}
 }
 
-/* setDeviceValue
- * sets the device's value to the specified value
- * addr - the address of the device
- * reg - the register to write
- * buff - the buffer pointer to values
- * count - number of values to write out from buffer
- * return SUCCESS if successful, non-zero if failed
+/*
+ * write count bytes from buffer buff to a berry, starting at register reg
  */
-int set_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
+int set_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,
 		uint8_t count)
 {
 	int error;
 	if (error = check_addr(addr))
-	{
 		return error;
-	}
 	else
-	{
 		return hal_setDeviceMultiRegs(addr, reg, buff, count);
-	}
 }
 
-/* update_proj_key
- * Updates the project key on the master and on the berries without changing
+/*
+ * Update the project key on the master and on the berries without changing
  * their addresses
  */
 int update_proj_key(uint16_t new_proj_key)
@@ -168,6 +120,31 @@ int update_proj_key(uint16_t new_proj_key)
 	return hal_update_proj_key(new_proj_key);
 }
 
+/*
+ * Enable a berry interrupt
+ */
+int enable_interrupt(uint8_t addr, uint8_t int_type)
+{
+	int error;
+	uint8_t int_reg;
+
+	// Read the berry's interrupt register
+	if (error = get_device_multi_values(addr, INT_EN_REG, &int_reg, 1))
+		return error;
+
+	// Set the int_type bit
+	int_reg |= int_type;
+
+	// Write it back
+	if (error = set_device_multi_values(addr, INT_EN_REG, &int_reg, 1))
+		return error;
+
+	// Set interrupt enable flag on master so that it will be polled in the
+	// vine interrupt event
+	myDeviceList.devices[addr].int_en = TRUE;
+	return SUCCESS;
+}
+
 /******************************************************************************
  Master functions *************************************************************
  *****************************************************************************/
@@ -175,12 +152,44 @@ int update_proj_key(uint16_t new_proj_key)
 /*
  * poll each berry to find which one interrupted
  * read its interrupt register - the berry will release the interrupt line
- * send to host
+ * send the interrupt register to the host
  * repeat until interrupt line is released
  */
 void vine_interrupt_event()
 {
+	// Static because we don't want to start over at 0 every time
+	static int i = 0;
 
+	int error;
+	Device_t *list = myDeviceList.devices;
+
+	// Loop while interrupt line is asserted (low)
+	while ((P1IN & BINT) == 0)
+	{
+		// Only read the berry's interrupt register if interrupts are enabled
+		if (list[i].int_en && !list[i].missing)
+		{
+			uint8_t int_reg;
+			if ((error = get_device_multi_values(list[i].address, INT_REG,
+					&int_reg, 1)) == SUCCESS)
+			{
+				// send the interrupt register back to host
+				interrupt_host(list[i].address, &int_reg, 1);
+			}
+			else
+			{
+				// report the error
+				char msg[40];
+				sprintf(msg, "err%d vine int ev read int reg", error);
+				send_log_msg(msg, error_msg);
+			}
+		}
+
+		// Next index
+		++i;
+		if (i >= DEVICES_ARRAY_SIZE)
+			i = 0;
+	}
 }
 
 /*
@@ -207,7 +216,7 @@ void hot_swap_event()
 			// of new device
 			uint8_t type = 0;
 			int error;
-			if (error = getDeviceTypeFromHal(addr, &type))
+			if (error = get_device_type(addr, &type))
 			{
 				// error - failed to get the type from the device
 				myDeviceList.devices[addr].address = 0;
@@ -269,7 +278,7 @@ void hot_swap_event()
 	++num_events;
 }
 
-/* send_log_msg
+/*
  * Sends a null-terminated error, log, or warning message to the host
  */
 void send_log_msg(char *msg, enum log_type_e log_type)
@@ -304,28 +313,25 @@ void send_log_msg(char *msg, enum log_type_e log_type)
  Local helper functions *******************************************************
  *****************************************************************************/
 
-/* clearNetwork
- * resets the device table
- * resets all devices
+/*
+ * clear the device table and reset all connected berries
  */
-static void clearNetwork()
+static void reset_network()
 {
-	myDeviceList.currNumDevices = 0;
+	myDeviceList.size = 0;
 	memset(myDeviceList.devices, 0, sizeof(myDeviceList.devices));
 	hal_resetAllDevices();
 }
 
-/* check_addr
- * checks to make sure the address is okay and the device is still there
+/*
+ * checks if address is valid and the berry is still connected
  */
 static int check_addr(uint8_t addr)
 {
-	// Is it a valid address?
 	if (addr <= 0 || addr > MAX_NUM_DEVICES)
 	{
 		return INVALID_ADDR;
 	}
-	// Is there a device at this address?
 	else if (!addrIsUsed(addr) || myDeviceList.devices[addr].missing)
 	{
 		return DEVICE_NOT_FOUND;
@@ -344,38 +350,6 @@ static int find_all_new_devices()
 	int error;
 	while ((error = find_new_device()) > 0);
 	return error;
-//	uint8_t addr;
-//	uint8_t type;
-//
-//	while (1)
-//	{
-//		addr = findUnusedAddress();
-//		if (addr == 0)
-//		{
-//			// error - full network
-//			// todo: Note - If we have exactly the
-//			// maximum number of allowed devices then this will return an
-//			// error. Should we say there can only be one less device (126)
-//			// than the maximum number of available addresses (127)?
-//			return NETWORK_FULL;
-//		}
-//		else if (!(hal_discoverNewDevice(addr)))
-//		{
-//			myDeviceList.devices[addr].address = addr;
-//			if (error = getDeviceTypeFromHal(addr, &type))
-//			{
-//				// error - failed to get the type from the device
-//				myDeviceList.devices[addr].type = UNKNOWN;
-//				myDeviceList.devices[addr].address = 0;
-//				return error;
-//			}
-//			myDeviceList.devices[addr].type = type;
-//			myDeviceList.devices[addr].missing = 0;
-//			myDeviceList.currNumDevices++;
-//		}
-//		else
-//			return SUCCESS; // no devices grabbed the address - we're done
-//	}
 }
 
 /*
@@ -397,7 +371,7 @@ static int find_new_device()
 	{
 		myDeviceList.devices[addr].address = addr;
 		myDeviceList.devices[addr].missing = 0;
-		myDeviceList.currNumDevices++;
+		myDeviceList.size++;
 		return addr;
 	}
 	else
@@ -405,8 +379,7 @@ static int find_new_device()
 }
 
 /*
- * return the lowest available address
- *     0 if there are no open addresses
+ * Return the lowest available address, or 0 if there are none available
  */
 static uint8_t get_available_address()
 {
@@ -419,12 +392,10 @@ static uint8_t get_available_address()
 		return i;
 }
 
-/* getDeviceTypeFromHal
- * addr - the address of the device on the network
- * value - store the type here
- * return 0 on success, nonzero otherwise
+/*
+ * Wrapper to make code cleaner
  */
-static inline int getDeviceTypeFromHal(uint8_t addr, uint8_t* value)
+static inline int get_device_type(uint8_t addr, uint8_t* value)
 {
 #define REG_TYPE 0
 	return get_device_multi_values(addr, REG_TYPE, value, 1);

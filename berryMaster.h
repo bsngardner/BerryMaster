@@ -92,9 +92,6 @@ enum SYS_ERRORS
 #define FALSE 0
 #define NULL 0
 
-// Device types
-#define UNKNOWN 0
-
 // Device interrupts
 #define INTR_SRC_MASTER 0
 #define INTR_TYPE_MISSING_BERRY 0
@@ -113,15 +110,14 @@ enum SYS_ERRORS
  * Data structures ************************************************************
  *****************************************************************************/
 
-/* Device
- * the device types are listed above in deviceTypes_e
- * the device address is also its number
+/*
  * if the device address is zero, the device is not configured
  */
 typedef struct Device
 {
 	uint8_t address;
 	uint8_t missing;
+	uint8_t int_en;
 } Device_t;
 
 // Maximum number of devices allowed on the network - limited to 127 because
@@ -129,19 +125,13 @@ typedef struct Device
 #define MAX_NUM_DEVICES 30u
 #define DEVICES_ARRAY_SIZE (MAX_NUM_DEVICES+1)
 
-/* deviceList
- * devices: An array of devices
- * currNumDevices: the current number of devices
- *
- * BIG-O:
- * Insertion and deletion are linear time
- * Referencing is constant time
+/*
+ * NOTE: don't access index 0, just access 1-127 and the address is
+ * 		 also the position of the berry in the array
  */
 typedef struct DeviceList
 {
-	// NOTE: don't access index 0, just access 1-127 and the address is
-	// 		 also the position of the berry in the array
-	uint8_t currNumDevices;
+	uint8_t size; // the current number of devices
 	Device_t devices[DEVICES_ARRAY_SIZE];
 } DeviceList_t;
 
@@ -150,11 +140,12 @@ typedef struct DeviceList
  *****************************************************************************/
 
 int init_devices(uint16_t project_key);
-int get_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
+int get_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,
 		uint8_t count);
-int set_device_multi_values(uint8_t addr, uint8_t reg, uint8_t* buff,
+int set_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,
 		uint8_t count);
 int update_proj_key(uint16_t new_proj_key);
+int enable_interrupt(uint8_t addr, uint8_t int_type);
 void vine_interrupt_event();
 void hot_swap_event();
 
