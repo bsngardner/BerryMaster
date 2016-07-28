@@ -9,6 +9,7 @@
 
 // Standard header files
 #include <msp430.h>
+#include <stdio.h>
 
 // Local header files
 #include "server.h"
@@ -101,7 +102,9 @@ int server_event()
 	// get the message:
 	if (error = isValidMessage())
 	{
-		send_log_msg("Error validating message in server event.", error_msg);
+		char msg[40];
+		sprintf(msg, "err%d @top of server_ev", error);
+		send_log_msg(msg, error_msg);
 		return error;
 	}
 

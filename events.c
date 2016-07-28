@@ -66,8 +66,8 @@ void events_nrf_callback();
 
 IObuffer* log_slot = 0;
 
-#define USB_SOURCE
-//#define NRF_SOURCE
+//#define USB_SOURCE
+#define NRF_SOURCE
 
 //#define DEBOUNCE_SW
 #ifdef DEBOUNCE_SW
@@ -173,8 +173,11 @@ void eventsLoop()
 		// Berry interrupt on the vine
 		else if (sys_event & VINE_EVENT)
 		{
-			sys_event &= ~VINE_EVENT;
 			vine_interrupt_event();
+			if (P1IN & BINT)
+			{
+				sys_event &= ~VINE_EVENT;
+			}
 		}
 
 		// Verify that berries are still connected and look for new ones

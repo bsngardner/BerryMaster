@@ -164,31 +164,47 @@ void vine_interrupt_event()
 	Device_t *list = myDeviceList.devices;
 
 	// Loop while interrupt line is asserted (low)
+	int loops = 0;
 	while ((P1IN & BINT) == 0)
 	{
+		// Next index
+		++i;
+		if (i >= DEVICES_ARRAY_SIZE)
+			i = 0;
+
 		// Only read the berry's interrupt register if interrupts are enabled
 		if (list[i].int_en && !list[i].missing)
 		{
-			uint8_t int_reg;
+			uint8_t int_reg = 0;
 			if ((error = get_device_multi_values(list[i].address, INT_REG,
 					&int_reg, 1)) == SUCCESS)
 			{
-				// send the interrupt register back to host
-				interrupt_host(list[i].address, &int_reg, 1);
+				// if the interrupt register is nonzero, that berry interrupted
+				if (int_reg)
+				{
+					// send the interrupt register back to host
+					interrupt_host(list[i].address, &int_reg, 1);
+					return;
+				}
 			}
 			else
 			{
 				// report the error
 				char msg[40];
-				sprintf(msg, "err%d vine int ev read int reg", error);
+				sprintf(msg, "err%d vine_int_ev read int_reg", error);
 				send_log_msg(msg, error_msg);
+				return;
 			}
 		}
 
-		// Next index
-		++i;
-		if (i >= DEVICES_ARRAY_SIZE)
-			i = 0;
+		// If we've checked every berry and the interrupt line is still
+		// asserted, there's a problem.
+		++loops;
+		if (loops >= DEVICES_ARRAY_SIZE)
+		{
+			send_log_msg("vine intr still asserted", warning_msg);
+			return;
+		}
 	}
 }
 
