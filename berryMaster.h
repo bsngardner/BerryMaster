@@ -103,7 +103,8 @@ enum SYS_ERRORS
 #define INVALID_ADDR 		-2
 #define DEVICE_NOT_FOUND	-3
 #define VALIDATE_LIST_ERR	-4
-#define READ_BYTES_LENGTH_EXCEEDED -5
+#define READ_BYTES_OVERFLOW -5
+#define SET_BYTES_OVERFLOW	-6
 #define SUCCESS				0
 
 /******************************************************************************
@@ -124,16 +125,6 @@ typedef struct Device
 // the vine uses 7 address bits, no device will be allowed to use address 0.
 #define MAX_NUM_DEVICES 30u
 #define DEVICES_ARRAY_SIZE (MAX_NUM_DEVICES+1)
-
-/*
- * NOTE: don't access index 0, just access 1-127 and the address is
- * 		 also the position of the berry in the array
- */
-typedef struct DeviceList
-{
-	uint8_t size; // the current number of devices
-	Device_t devices[DEVICES_ARRAY_SIZE];
-} DeviceList_t;
 
 /******************************************************************************
  * master API function prototypes *********************************************

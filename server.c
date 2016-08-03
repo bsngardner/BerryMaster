@@ -215,7 +215,7 @@ void rpc_getDeviceMultiValues()
 	int8_t result;
 	if (count > 25)
 	{
-		result = READ_BYTES_LENGTH_EXCEEDED; // return error
+		result = READ_BYTES_OVERFLOW; // return error
 		int i;
 		for (i = 0; i < 25; i++)
 			buff[i] = 0xff;
@@ -250,7 +250,7 @@ void rpc_setDeviceMultiValues()
 
 	if (count > 25)
 	{
-		result = READ_BYTES_LENGTH_EXCEEDED; // return error
+		result = SET_BYTES_OVERFLOW; // return error
 	}
 	else
 	{

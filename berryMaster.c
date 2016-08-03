@@ -18,8 +18,8 @@
 /******************************************************************************
  variables ********************************************************************
  *****************************************************************************/
-#pragma PERSISTENT(myDeviceList)
-DeviceList_t myDeviceList =
+#pragma PERSISTENT(berry_list)
+Device_t berry_list[DEVICES_ARRAY_SIZE] =
 { 0 };
 
 #pragma PERSISTENT(fram_proj_key)
@@ -32,7 +32,7 @@ static uint8_t proj_initialized = FALSE;
  *****************************************************************************/
 
 // return 1 if a berry has that address
-#define addrIsUsed(addr) (myDeviceList.devices[addr].address > 0)
+#define addrIsUsed(addr) (berry_list[addr].address > 0)
 
 #define INT_EN_REG 	-4
 #define INT_REG 	-5
@@ -42,7 +42,6 @@ static int check_addr(uint8_t addr);
 static int find_all_new_devices();
 static int find_new_device();
 static uint8_t get_available_address();
-static inline int get_device_type(uint8_t addr, uint8_t* value);
 
 /******************************************************************************
  API functions ****************************************************************
@@ -141,7 +140,7 @@ int enable_interrupt(uint8_t addr, uint8_t int_type)
 
 	// Set interrupt enable flag on master so that it will be polled in the
 	// vine interrupt event
-	myDeviceList.devices[addr].int_en = TRUE;
+	berry_list[addr].int_en = TRUE;
 	return SUCCESS;
 }
 
@@ -161,7 +160,6 @@ void vine_interrupt_event()
 	static int i = 0;
 
 	int error;
-	Device_t *list = myDeviceList.devices;
 
 	// Loop while interrupt line is asserted (low)
 	int loops = 0;
@@ -173,17 +171,17 @@ void vine_interrupt_event()
 			i = 0;
 
 		// Only read the berry's interrupt register if interrupts are enabled
-		if (list[i].int_en && !list[i].missing)
+		if (berry_list[i].int_en && !berry_list[i].missing)
 		{
 			uint8_t int_reg = 0;
-			if ((error = get_device_multi_values(list[i].address, INT_REG,
+			if ((error = get_device_multi_values(berry_list[i].address, INT_REG,
 					&int_reg, 1)) == SUCCESS)
 			{
 				// if the interrupt register is nonzero, that berry interrupted
 				if (int_reg)
 				{
 					// send the interrupt register back to host
-					interrupt_host(list[i].address, &int_reg, 1);
+					interrupt_host(berry_list[i].address, &int_reg, 1);
 					return;
 				}
 			}
@@ -221,37 +219,25 @@ void hot_swap_event()
 	{
 		return;
 	}
-	// Every 4th call, check for new devices
+	// Every 4th call, check for a new device
 	if ((num_events & 3) == 0)
 	{
 		uint8_t addr;
 		hal_check_proj_key(fram_proj_key);
 		if (addr = find_new_device())
 		{
-			// There's a new device! Interrupt the host with address and type
-			// of new device
-			uint8_t type = 0;
-			int error;
-			if (error = get_device_type(addr, &type))
-			{
-				// error - failed to get the type from the device
-				myDeviceList.devices[addr].address = 0;
-				char msg[40];
-				sprintf(msg, "Err%d get new device type.", error);
-				send_log_msg(msg, error_msg);
-			}
-			uint8_t buff[3] =
-			{ INTR_TYPE_NEW_BERRY, addr, type };
-			interrupt_host(INTR_SRC_MASTER, buff, 3);
+			// Interrupt the host with address of new device
+			uint8_t buff[2] =
+			{ INTR_TYPE_NEW_BERRY, addr};
+			interrupt_host(INTR_SRC_MASTER, buff, 2);
 		}
 	}
 	// 3 out of 4 calls, ping a device
 	else
 	{
-		Device_t *device_list = myDeviceList.devices;
 		uint8_t addr;
 		// Grab the next address
-		addr = device_list[curr_device].address;
+		addr = berry_list[curr_device].address;
 		// Only ping if address is nonzero (there's actually a berry there)
 		if (addr != 0)
 		{
@@ -259,25 +245,25 @@ void hot_swap_event()
 			if (hal_pingDevice(addr) != SUCCESS)
 			{
 				// Only interrupt if the device wasn't already missing
-				if (!device_list[curr_device].missing)
+				if (!berry_list[curr_device].missing)
 				{
 					// notify host of the missing berry and its address
 					uint8_t buff[2] =
 					{ INTR_TYPE_MISSING_BERRY, addr };
 					interrupt_host(INTR_SRC_MASTER, buff, 2);
-					device_list[curr_device].missing = 1;
+					berry_list[curr_device].missing = TRUE;
 				}
 			}
 			else
 			{
 				// It answered. If it was missing, then notify the host
 				// that it's back again.
-				if (device_list[curr_device].missing)
+				if (berry_list[curr_device].missing)
 				{
 					uint8_t buff[2] =
 					{ INTR_TYPE_FOUND_BERRY, addr };
 					interrupt_host(INTR_SRC_MASTER, buff, 2);
-					device_list[curr_device].missing = 0;
+					berry_list[curr_device].missing = FALSE;
 				}
 			}
 		}
@@ -334,8 +320,7 @@ void send_log_msg(char *msg, enum log_type_e log_type)
  */
 static void reset_network()
 {
-	myDeviceList.size = 0;
-	memset(myDeviceList.devices, 0, sizeof(myDeviceList.devices));
+	memset(berry_list, 0, sizeof(berry_list));
 	hal_resetAllDevices();
 }
 
@@ -348,7 +333,7 @@ static int check_addr(uint8_t addr)
 	{
 		return INVALID_ADDR;
 	}
-	else if (!addrIsUsed(addr) || myDeviceList.devices[addr].missing)
+	else if (!addrIsUsed(addr) || berry_list[addr].missing)
 	{
 		return DEVICE_NOT_FOUND;
 	}
@@ -385,9 +370,9 @@ static int find_new_device()
 	// Offer a new address to an open device.
 	else if (!(hal_discoverNewDevice(addr)))
 	{
-		myDeviceList.devices[addr].address = addr;
-		myDeviceList.devices[addr].missing = 0;
-		myDeviceList.size++;
+		berry_list[addr].address = addr;
+		berry_list[addr].missing = 0;
+		berry_list[addr].int_en = 0;
 		return addr;
 	}
 	else
@@ -406,14 +391,5 @@ static uint8_t get_available_address()
 		return 0;
 	else
 		return i;
-}
-
-/*
- * Wrapper to make code cleaner
- */
-static inline int get_device_type(uint8_t addr, uint8_t* value)
-{
-#define REG_TYPE 0
-	return get_device_multi_values(addr, REG_TYPE, value, 1);
 }
 
