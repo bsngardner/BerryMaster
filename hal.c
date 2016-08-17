@@ -85,6 +85,7 @@ uint8_t hal_sleep()
 	}
 }
 
+#define BUBBLE 0x7D
 //Sends 0x00 on general call followed by new address.  Returns 0 if address accepted,
 //	1 if address not accepted
 uint8_t hal_discoverNewDevice(uint8_t new_address)
@@ -93,7 +94,8 @@ uint8_t hal_discoverNewDevice(uint8_t new_address)
 	txPtr = txData;
 	txPtr[0] = NEW_ADDR_CMD;
 	txPtr[1] = new_address;
-	configure_i2c(2);
+	txPtr[2] = BUBBLE;
+	configure_i2c(3);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
 
 	status = DATA;
@@ -140,8 +142,8 @@ uint8_t hal_check_proj_key(uint16_t proj_key)
 	UCB0I2CSA = GEN_CALL;
 	txPtr = txData;
 	txPtr[0] = PROJKEY_VERIFY_CMD;
-	txPtr[1] = (uint8_t)(proj_key & 0xff);
-	txPtr[2] = (uint8_t)((proj_key >> 8) & 0xff);
+	txPtr[1] = (uint8_t) ((proj_key >> 8) & 0xff);
+	txPtr[2] = (uint8_t) (proj_key & 0xff);
 	configure_i2c(3);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
 
@@ -157,8 +159,8 @@ uint8_t hal_update_proj_key(uint16_t proj_key)
 	UCB0I2CSA = GEN_CALL;
 	txPtr = txData;
 	txPtr[0] = PROJKEY_UPDATE_CMD;
-	txPtr[1] = (uint8_t)(proj_key & 0xff);
-	txPtr[2] = (uint8_t)((proj_key >> 8) & 0xff);
+	txPtr[1] = (uint8_t) (proj_key & 0xff);
+	txPtr[2] = (uint8_t) ((proj_key >> 8) & 0xff);
 	configure_i2c(3);
 	UCB0IE |= UCTXIE0 | UCNACKIE | UCSTPIE;
 
