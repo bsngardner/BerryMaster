@@ -96,7 +96,7 @@ static int msp430init()
 
 	// Initialize Port 1
 	P1SEL0 = P1SEL1 = 0; // Port 1 is GPIO
-	P1DIR = BCLK; // output pins = 1; input = 0
+	P1DIR = 0; // output pins = 1; input = 0
 	// Init button interrupt on port 1:
 	P1REN = SW1 | INT0 | BINT; // pull-up resistors: switch1, radio, vine intr
 	P1IE = SW1 | INT0 | BINT; // enable interrupts
@@ -105,7 +105,7 @@ static int msp430init()
 
 	// Initialize Port 2
 	P2SEL0 = P2SEL1 = 0; // Port 2 is GPIO
-	P2DIR = MOSI | MOBI | RFCS | RFCE; // these are outputs, others are inputs
+	P2DIR = RFCS | RFCE; // these are outputs, others are inputs
 	P2REN = BCHG; // pull-up on battery charger
 	P2OUT = RFCS | BCHG; // high on radio chip select and battery charger
 
