@@ -130,11 +130,11 @@ static int msp430init()
 		return err;
 	}
 
-//	if (err = nrf_init(100, 2))
-//	{ //init radio
-//	  // (ends with radio powered down, pipe must be opened)
-//		return err;
-//	}
+	if (err = nrf_init(40, 2))
+	{ //init radio
+	  // (ends with radio powered down, pipe must be opened)
+		return err;
+	}
 
 	if (err = ft201x_init())
 	{ // init the USB comm chip (ft201x)
