@@ -184,13 +184,14 @@ void rpc_initDevices()
 {
 	// Get the project key from the message
 	uint16_t project_key;
-	uint8_t lo, hi;
+	uint8_t lo, hi, hot_swap_en;
 	READ(lo);
 	READ(hi);
+	READ(hot_swap_en);
 	project_key = lo | (hi << 8);
 
 	// Call init devices
-	uint8_t result = init_devices(project_key);
+	uint8_t result = init_devices(project_key, hot_swap_en);
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);

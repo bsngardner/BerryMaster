@@ -130,7 +130,7 @@ typedef struct Device
  * master API function prototypes *********************************************
  *****************************************************************************/
 
-int init_devices(uint16_t project_key);
+int init_devices(uint16_t project_key, uint8_t hot_swap_en);
 int get_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,
 		uint8_t count);
 int set_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,

@@ -25,7 +25,7 @@ Device_t berry_list[DEVICES_ARRAY_SIZE] =
 #pragma PERSISTENT(fram_proj_key)
 uint16_t fram_proj_key = 0;
 
-static uint8_t proj_initialized = FALSE;
+static uint8_t hot_swapping_enabled = FALSE;
 
 /******************************************************************************
  function prototypes and macros ***********************************************
@@ -50,10 +50,12 @@ static uint8_t get_available_address();
 /*
  * Initialize master and berry network with project key
  */
-int init_devices(uint16_t project_key)
+int init_devices(uint16_t project_key, uint8_t hot_swap_en)
 {
 	int error;
-	proj_initialized = FALSE;
+
+	// Disable hot-swapping while initializing the berry network.
+	hot_swapping_enabled = FALSE;
 
 	// If the project key is different, reset the network and update the
 	// project key
@@ -74,8 +76,10 @@ int init_devices(uint16_t project_key)
 		return error;
 	}
 
+	// Conditionally enable hot-swapping
+	hot_swapping_enabled = hot_swap_en;
+
 	// We're done.
-	proj_initialized = TRUE;
 	return SUCCESS; // success
 }
 
@@ -215,7 +219,7 @@ void hot_swap_event()
 	static uint16_t curr_device = 0;
 	static uint8_t num_events = 0;
 	// If the initialization hasn't happened yet, return immediately
-	if (!proj_initialized)
+	if (!hot_swapping_enabled)
 	{
 		return;
 	}
