@@ -1,8 +1,10 @@
 /*
- * rpcHandlers.h
+ * server.h
  *
  *  Created on: Dec 3, 2015
- *      Author: Berry_Admin
+ *      Authors:
+ *      Marshall Garey
+ *      Broderick Gardner
  */
 
 #ifndef SERVER_H_

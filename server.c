@@ -1,5 +1,5 @@
 /*
- * rpcHandlers.c
+ * server.c
  *
  *  Created on: Dec 3, 2015
  *      Authors:
@@ -17,7 +17,7 @@
 #include "ft201x.h"
 #include "berryMaster.h"
 
-// BIG TODO: handle IOputc errors
+// BIG TODO: handle IOputc/IOgetc errors
 
 // ----------------------------------------------------------------------------
 // Global variables -----------------------------------------------------------
@@ -34,7 +34,6 @@ static int isValidMessage();
 static void rpc_initDevices();
 static void rpc_getDeviceMultiValues();
 static void rpc_setDeviceMultiValues();
-static void rpc_setProjectKey();
 static void setReply(uint8_t replyLength, uint8_t result,
 		uint8_t* buff, uint8_t count);
 static void rpc_enableInterrupt();
@@ -68,10 +67,9 @@ static void rpc_enableInterrupt();
 
 // opcodes
 #define OP_INIT_DEVICES 0
-#define OP_GET_MUL_VALS 4
-#define OP_SET_MUL_VALS 5
-#define OP_SET_PROJ_KEY 6
-#define OP_EN_INTERRUPT 7
+#define OP_GET_MUL_VALS 1
+#define OP_SET_MUL_VALS 2
+#define OP_EN_INTERRUPT 3
 
 // ----------------------------------------------------------------------------
 // Function definitions -------------------------------------------------------
@@ -111,7 +109,6 @@ int server_event()
 	// get the opcode from the message
 	if (error = READ(opcode))
 	{
-		// TODO: handle this better
 		return error;
 	}
 
@@ -135,10 +132,6 @@ int server_event()
 	case OP_SET_MUL_VALS:
 		// Set multiple registers in the berry.
 		rpc_setDeviceMultiValues();
-		break;
-	case OP_SET_PROJ_KEY:
-		// Update the project key
-		rpc_setProjectKey();
 		break;
 	case OP_EN_INTERRUPT:
 		// Enable an interrupt on the berry
@@ -170,7 +163,7 @@ int isValidMessage()
 	if (server_buffer->count < length)
 	{
 		// Don't have the full message, return error.
-		return -2;
+		return -7;
 	}
 	length = 0;
 	// We have a full message.
@@ -183,15 +176,11 @@ int isValidMessage()
 void rpc_initDevices()
 {
 	// Get the project key from the message
-	uint16_t project_key;
-	uint8_t lo, hi, hot_swap_en;
-	READ(lo);
-	READ(hi);
+	uint8_t hot_swap_en;
 	READ(hot_swap_en);
-	project_key = lo | (hi << 8);
 
 	// Call init devices
-	uint8_t result = init_devices(project_key, hot_swap_en);
+	uint8_t result = init_devices(hot_swap_en);
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
@@ -200,8 +189,8 @@ void rpc_initDevices()
 void rpc_getDeviceMultiValues()
 {
 	// Get the address from the message
-	uint8_t addr;
-	READ(addr);
+	uint8_t dev_num;
+	READ(dev_num);
 
 	// Get the register from the message
 	uint8_t reg;
@@ -223,7 +212,7 @@ void rpc_getDeviceMultiValues()
 	}
 	else
 	{
-		result = get_device_multi_values(addr, reg, buff, count);
+		result = get_device_multi_values(dev_num, reg, buff, count);
 		buff[count] = 0;
 	}
 
@@ -234,8 +223,8 @@ void rpc_getDeviceMultiValues()
 void rpc_setDeviceMultiValues()
 {
 	// Get the address from the message
-	uint8_t addr;
-	READ(addr);
+	uint8_t dev_num;
+	READ(dev_num);
 
 	// Get the register from the message
 	uint8_t reg;
@@ -258,40 +247,24 @@ void rpc_setDeviceMultiValues()
 		int i;
 		for (i = 0; i < count; i++)
 			READ(value_buff[i]);
-		result = set_device_multi_values(addr, reg, value_buff, count);
+		result = set_device_multi_values(dev_num, reg, value_buff, count);
 	}
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
 }
 
-static void rpc_setProjectKey()
-{
-	// Get the project key from the message - 2 bytes
-	uint16_t new_proj_key;
-	uint16_t lo, hi;
-	READ(lo);
-	READ(hi);
-	new_proj_key = (hi << 8) | lo;
-
-	// Update the project key
-	uint8_t result = update_proj_key(new_proj_key);
-
-	// Put reply in output buffer
-	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
-}
-
 static void rpc_enableInterrupt()
 {
-	uint8_t addr;
-	READ(addr);
+	uint8_t dev_num;
+	READ(dev_num);
 
 	// Interrupt type
 	uint8_t int_type;
 	READ(int_type);
 
 	// Enable the interrupt on the berry
-	uint8_t result = enable_interrupt(addr, int_type);
+	uint8_t result = enable_interrupt(dev_num, int_type);
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
