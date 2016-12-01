@@ -85,13 +85,6 @@ enum SYS_ERRORS
 	SYS_ERR_RX_HOST_MSG,	// 9 error receiving message from host
 	SYS_ERR_MALLOC			// 10 error using malloc
 };
-
-// Other macros
-#define ASCII_ZERO 48
-#define TRUE 1
-#define FALSE 0
-#define NULL 0
-
 // Device interrupts
 #define INTR_SRC_MASTER 0
 #define INTR_TYPE_MISSING_BERRY 0
@@ -105,7 +98,15 @@ enum SYS_ERRORS
 #define VALIDATE_LIST_ERR	-4
 #define READ_BYTES_OVERFLOW -5
 #define SET_BYTES_OVERFLOW	-6
+#define INCOMPLETE_MESSAGE	-7
+#define GET_ALL_BERRIES_ERR	-8
 #define SUCCESS				0
+
+// Other macros
+#define ASCII_ZERO 48
+#define TRUE 1
+#define FALSE 0
+#define NULL 0
 
 /******************************************************************************
  * master API function prototypes *********************************************
@@ -117,6 +118,7 @@ int get_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,
 int set_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,
 		uint8_t count);
 int enable_interrupt(uint8_t addr, uint8_t int_type);
+int get_connected_berries(uint8_t *buff);
 void vine_interrupt_event();
 void hot_swap_event();
 

@@ -10,6 +10,7 @@
 // Standard header files
 #include <msp430.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // Local header files
 #include "server.h"
@@ -34,6 +35,7 @@ static int isValidMessage();
 static void rpc_initDevices();
 static void rpc_getDeviceMultiValues();
 static void rpc_setDeviceMultiValues();
+static void rpc_getConnectedBerries();
 static void setReply(uint8_t replyLength, uint8_t result,
 		uint8_t* buff, uint8_t count);
 static void rpc_enableInterrupt();
@@ -70,6 +72,7 @@ static void rpc_enableInterrupt();
 #define OP_GET_MUL_VALS 1
 #define OP_SET_MUL_VALS 2
 #define OP_EN_INTERRUPT 3
+#define OP_GET_ALL_DEVS 4
 
 // ----------------------------------------------------------------------------
 // Function definitions -------------------------------------------------------
@@ -137,6 +140,9 @@ int server_event()
 		// Enable an interrupt on the berry
 		rpc_enableInterrupt();
 		break;
+	case OP_GET_ALL_DEVS:
+		rpc_getConnectedBerries();
+		break;
 	default:
 		break;
 	}
@@ -148,7 +154,7 @@ int server_event()
  * Vaildates the message from the host - don't service if message is
  * invalid or incomplete.
  */
-int isValidMessage()
+static int isValidMessage()
 {
 	int error;
 	static uint8_t length;
@@ -163,7 +169,7 @@ int isValidMessage()
 	if (server_buffer->count < length)
 	{
 		// Don't have the full message, return error.
-		return -7;
+		return INCOMPLETE_MESSAGE;
 	}
 	length = 0;
 	// We have a full message.
@@ -173,7 +179,7 @@ int isValidMessage()
 /*
  * calls master initDevices function and sends a reply back to the host
  */
-void rpc_initDevices()
+static void rpc_initDevices()
 {
 	// Get the project key from the message
 	uint8_t hot_swap_en;
@@ -186,7 +192,7 @@ void rpc_initDevices()
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
 }
 
-void rpc_getDeviceMultiValues()
+static void rpc_getDeviceMultiValues()
 {
 	// Get the address from the message
 	uint8_t dev_num;
@@ -220,7 +226,7 @@ void rpc_getDeviceMultiValues()
 	setReply(STD_REPLY_LENGTH + count, result, buff, count);
 }
 
-void rpc_setDeviceMultiValues()
+static void rpc_setDeviceMultiValues()
 {
 	// Get the address from the message
 	uint8_t dev_num;
@@ -254,6 +260,22 @@ void rpc_setDeviceMultiValues()
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
 }
 
+static void rpc_getConnectedBerries()
+{
+	uint8_t *buff = NULL;
+	int8_t result;
+
+	// Make the server call.
+	result = get_connected_berries(buff);
+	uint8_t count = sizeof(buff);
+
+	// Put reply in output buffer.
+	setReply(STD_REPLY_LENGTH + count, result, buff, count);
+
+	// Free buff because it was dynamically allocated.
+	free(buff);
+}
+
 static void rpc_enableInterrupt()
 {
 	uint8_t dev_num;
@@ -281,7 +303,7 @@ static void rpc_enableInterrupt()
  * result - result of the reply
  * buff - additional data to send to the host
  */
-void setReply(uint8_t replyLength, uint8_t result,
+static void setReply(uint8_t replyLength, uint8_t result,
 		uint8_t* buff, uint8_t count)
 {
 	// Standard reply data: length, type, id, and result

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <msp430.h>
+#include <stdlib.h>
 
 // Local headers
 #include "berryMaster.h"
@@ -20,8 +21,6 @@
  Macros ***********************************************************************
  *****************************************************************************/
 
-// Maximum number of devices allowed on the network - limited to 127 because
-// the vine uses 7 address bits, no device will be allowed to use address 0.
 #define MAX_NUM_DEVICES 32u
 #define MAX_I2C_ADDR	127
 #define INT_EN_REG 		-4
@@ -32,30 +31,36 @@
  *****************************************************************************/
 
 // Berry struct
-typedef struct Device
+typedef struct Berry
 {
 	uint8_t i2c_addr;	// vine i2c address
 	uint8_t int_en;		// interrupt enable
-} Device_t;
+} Berry_t;
 
 // Berry network. The index is the i2c address.
-static Device_t berry_list[MAX_NUM_DEVICES] =
+static Berry_t berry_list[MAX_NUM_DEVICES] =
 { 0 };
 
+// Self-explanatory
+static uint8_t num_connected_berries = 0;
+
+// Bit array - each bit represents whether or not the associated i2c address
+// is taken or not.
 static uint8_t used_i2c_addresses[MAX_NUM_DEVICES/8];
 
+// Self-explanatory
 static uint8_t hot_swapping_enabled = FALSE;
 
 /******************************************************************************
  Function prototypes **********************************************************
  *****************************************************************************/
 static void reset_network();
-static int check_addr(uint8_t addr);
+static int is_valid_dev_num(uint8_t addr);
 static int find_all_new_devices();
 static int find_new_device();
 static uint8_t get_available_address();
-static void add_berry(uint8_t addr);
-static void remove_berry(uint8_t dev_num);
+static int add_berry(uint8_t addr);
+static int remove_berry(uint8_t dev_num);
 static int ping_berry(uint8_t i2c_addr);
 
 /******************************************************************************
@@ -100,7 +105,7 @@ int get_device_multi_values(uint8_t dev_num, int8_t reg, uint8_t* buff,
 		uint8_t count)
 {
 	int error;
-	if (error = check_addr(dev_num))
+	if (error = is_valid_dev_num(dev_num))
 		return error;
 	else
 		return hal_getDeviceMultiRegs(berry_list[dev_num].i2c_addr, reg, buff, count);
@@ -113,7 +118,7 @@ int set_device_multi_values(uint8_t dev_num, int8_t reg, uint8_t* buff,
 		uint8_t count)
 {
 	int error;
-	if (error = check_addr(dev_num))
+	if (error = is_valid_dev_num(dev_num))
 		return error;
 	else
 		return hal_setDeviceMultiRegs(berry_list[dev_num].i2c_addr, reg, buff, count);
@@ -141,6 +146,49 @@ int enable_interrupt(uint8_t dev_num, uint8_t int_type)
 	// Set interrupt enable flag on master so that it will be polled in the
 	// vine interrupt event
 	berry_list[dev_num].int_en = TRUE;
+	return SUCCESS;
+}
+
+/*
+ * Returns a list of the connected berries in the following format:
+ * Number of berries, list of device numbers from least to greatest
+ *
+ * e.g. [5, 0, 1, 2, 3, 4] => 5 berries, device numbers ranging from 0 to 4.
+ *
+ * Although device numbers are assigned from least to greatest, there is no
+ * guarantee that they will be contiguous, because when a berry is unplugged,
+ * the device numbers are not reassigned.
+ *
+ * This function dynamically allocates memory for the buffer.
+ * The caller must free the memory.
+ */
+int get_connected_berries(uint8_t *buff)
+{
+	// Allocate an additional byte for the number of connected berries.
+	buff = (uint8_t*) malloc(num_connected_berries+1);
+
+	// Assemble the packet:
+
+	buff[0] = num_connected_berries;
+	int i;
+	uint8_t dev_num = 0;
+	for (i = 1; i <= num_connected_berries; i++)
+	{
+		// Because device numbers aren't necessarily contiguous, search for
+		// the next device number.
+		while (berry_list[dev_num].i2c_addr == 0)
+		{
+			++dev_num;
+			// If there is an error here, it is an internal bug.
+			if (dev_num >= MAX_NUM_DEVICES)
+			{
+				send_log_msg("Error in get_connected_berries", error_msg);
+				return GET_ALL_BERRIES_ERR;
+			}
+		}
+		buff[i] = dev_num;
+		++dev_num;
+	}
 	return SUCCESS;
 }
 
@@ -320,18 +368,22 @@ void send_log_msg(char *msg, enum log_type_e log_type)
  *****************************************************************************/
 
 /*
- * clear the device table and reset all connected berries
+ * Clear the device table and reset all connected berries
  */
 static void reset_network()
 {
 	memset(berry_list, 0, sizeof(berry_list));
 	hal_resetAllDevices();
+	num_connected_berries = 0;
+	memset(used_i2c_addresses, 0, sizeof(used_i2c_addresses));
 }
 
 /*
- * checks if address is valid and the berry is still connected
+ * 1. Checks that dev_num is valid.
+ * 2. Checks if a berry has the associated device number.
+ * Return 0 if both checks pass, negative error code otherwise.
  */
-static int check_addr(uint8_t dev_num)
+static int is_valid_dev_num(uint8_t dev_num)
 {
 	if (dev_num > MAX_NUM_DEVICES)
 	{
@@ -352,8 +404,9 @@ static int check_addr(uint8_t dev_num)
  * Parameter addr is its i2c address.
  * We need to give it a device number (its index in the list). Find an index
  * where the i2c address is zero - that entry is empty, so we can add it there.
+ * Return 0 if the berry was added, a negative error code otherwise.
  */
-static void add_berry(uint8_t addr)
+static int add_berry(uint8_t addr)
 {
 	uint8_t i;
 	for (i = 0; i < MAX_NUM_DEVICES; i++)
@@ -362,30 +415,45 @@ static void add_berry(uint8_t addr)
 		{
 			berry_list[i].i2c_addr = addr;
 			berry_list[i].int_en = 0;
+			++num_connected_berries;
 
 			// Add the address to the used i2c addresses.
 			uint8_t index = addr >> 3;			// /8
 			uint8_t bit = 1 << (addr & 0xff);	// %8
 			used_i2c_addresses[index] |= bit;
+			return SUCCESS;
 		}
 	}
+	return NETWORK_FULL;
 }
 
 /*
  * Remove a berry from the list.
  * Parameter dev_num is the berry device number (its index in the list).
+ * Return 0 if successful, a negative error code if there was no berry
+ * with the specified device number.
  */
-static void remove_berry(uint8_t dev_num)
+static int remove_berry(uint8_t dev_num)
 {
-	// Remove the address to the used i2c addresses.
+	// Check if the berry exists (it should, since this is an internal
+	// function, assuming we're using this correctly).
 	uint8_t addr = berry_list[dev_num].i2c_addr;
+	if (addr == 0)
+	{
+		send_log_msg("Err in remove_berry", error_msg);
+		return DEVICE_NOT_FOUND;
+	}
+
+	// Remove the address from the used i2c addresses list.
 	uint8_t index = addr >> 3;			// /8
 	uint8_t bit = 1 << (addr & 0xff);	// %8
-	used_i2c_addresses[index] |= bit;
+	used_i2c_addresses[index] &= ~bit;
 
 	// Remove the berry from the list.
 	berry_list[dev_num].i2c_addr = 0;
 	berry_list[dev_num].int_en = 0;
+	--num_connected_berries;
+	return SUCCESS;
 }
 
 /*
@@ -427,20 +495,23 @@ static int find_all_new_devices()
 static int find_new_device()
 {
 	uint8_t addr;
+	int error;
 	addr = get_available_address();
 	if (addr == 0)
 	{
 		return NETWORK_FULL;
 	}
 	// Offer a new address to an open device.
-	else if (!(hal_discoverNewDevice(addr)))
+	else if (hal_discoverNewDevice(addr) == SUCCESS)
 	{
 		// Only add the berry if it responds to pinging.
 		if (ping_berry(addr) == SUCCESS)
 		{
 			// The berry responded. Add it to the list and return.
-			add_berry(addr);
-			return addr;
+			if (error = add_berry(addr))
+				return error;
+			else
+				return addr;
 		}
 	}
 
@@ -449,8 +520,8 @@ static int find_new_device()
 
 /*
  * Return an available vine i2c address, or 0 if there are none available.
- * TODO: don't get the lowest available address. Change this (talk to Kristian -
- * he had a good idea).
+ * TODO: don't get the lowest available address. Change this (Kristian had
+ * a good idea).
  */
 static uint8_t get_available_address()
 {
@@ -474,7 +545,8 @@ static uint8_t get_available_address()
 		else
 		{
 			// Return a valid and unused i2c address.
-			return next_i2c_addr;
+			// For optimization's sake, increment the next_i2c_addr.
+			return next_i2c_addr++;
 		}
 	}
 
