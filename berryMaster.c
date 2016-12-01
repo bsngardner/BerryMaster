@@ -60,7 +60,7 @@ static int find_all_new_devices();
 static int find_new_device();
 static uint8_t get_available_address();
 static int add_berry(uint8_t addr);
-static int remove_berry(uint8_t dev_num);
+static int remove_berry(uint8_t device_number);
 static int ping_berry(uint8_t i2c_addr);
 
 /******************************************************************************
@@ -271,13 +271,13 @@ void hot_swap_event()
 	// Every 4th call, check for a new device.
 	if ((num_events & 3) == 0)
 	{
-		uint8_t addr;
-		if (addr = find_new_device())
+		int device_number = find_new_device();
+		if (device_number < 0)
 		{
-			// Interrupt the host with address of new device
-			uint8_t buff[2] =
-			{ INTR_TYPE_NEW_BERRY, addr};
-			interrupt_host(INTR_SRC_MASTER, buff, 2);
+			// Found a berry, but had an error adding it (network full)
+			char msg[25];
+			sprintf(msg, "Err%d adding berry", device_number);
+			send_log_msg(msg, error_msg);
 		}
 	}
 	// 3 out of 4 calls, ping a device.
@@ -307,15 +307,7 @@ void hot_swap_event()
 		// Otherwise, ping the berry.
 		if (hal_pingDevice(curr_device) != SUCCESS)
 		{
-			// No answer - notify host of the missing berry.
-			uint8_t buff[2] =
-			{
-					INTR_TYPE_MISSING_BERRY,
-					curr_device
-			};
-			interrupt_host(INTR_SRC_MASTER, buff, 2);
-
-			// Delete the berry from the list.
+			// No answer - delete the berry and notify the host.
 			remove_berry(curr_device);
 		}
 
@@ -400,44 +392,49 @@ static int is_valid_dev_num(uint8_t dev_num)
 }
 
 /*
- * Add a berry to the list.
+ * Add a berry to the list and notify the host.
  * Parameter addr is its i2c address.
  * We need to give it a device number (its index in the list). Find an index
  * where the i2c address is zero - that entry is empty, so we can add it there.
- * Return 0 if the berry was added, a negative error code otherwise.
+ * Return the positive device number if the berry was added,
+ * a negative error code otherwise.
  */
 static int add_berry(uint8_t addr)
 {
-	uint8_t i;
-	for (i = 0; i < MAX_NUM_DEVICES; i++)
+	uint8_t device_number;
+	for (device_number = 0; device_number < MAX_NUM_DEVICES; device_number++)
 	{
-		if (berry_list[i].i2c_addr == 0)
+		if (berry_list[device_number].i2c_addr == 0)
 		{
-			berry_list[i].i2c_addr = addr;
-			berry_list[i].int_en = 0;
+			berry_list[device_number].i2c_addr = addr;
+			berry_list[device_number].int_en = 0;
 			++num_connected_berries;
 
 			// Add the address to the used i2c addresses.
 			uint8_t index = addr >> 3;			// /8
 			uint8_t bit = 1 << (addr & 0xff);	// %8
 			used_i2c_addresses[index] |= bit;
-			return SUCCESS;
+
+			// Notify the host of the new berry.
+			uint8_t buff[2] = { INTR_TYPE_NEW_BERRY, device_number};
+			interrupt_host(INTR_SRC_MASTER, buff, 2);
+			return device_number;
 		}
 	}
 	return NETWORK_FULL;
 }
 
 /*
- * Remove a berry from the list.
+ * Remove a berry from the list and notify the host.
  * Parameter dev_num is the berry device number (its index in the list).
  * Return 0 if successful, a negative error code if there was no berry
  * with the specified device number.
  */
-static int remove_berry(uint8_t dev_num)
+static int remove_berry(uint8_t device_number)
 {
 	// Check if the berry exists (it should, since this is an internal
 	// function, assuming we're using this correctly).
-	uint8_t addr = berry_list[dev_num].i2c_addr;
+	uint8_t addr = berry_list[device_number].i2c_addr;
 	if (addr == 0)
 	{
 		send_log_msg("Err in remove_berry", error_msg);
@@ -450,9 +447,13 @@ static int remove_berry(uint8_t dev_num)
 	used_i2c_addresses[index] &= ~bit;
 
 	// Remove the berry from the list.
-	berry_list[dev_num].i2c_addr = 0;
-	berry_list[dev_num].int_en = 0;
+	berry_list[device_number].i2c_addr = 0;
+	berry_list[device_number].int_en = 0;
 	--num_connected_berries;
+
+	// Notify the host with an interrupt.
+	uint8_t buff[2] = { INTR_TYPE_MISSING_BERRY, device_number };
+	interrupt_host(INTR_SRC_MASTER, buff, 2);
 	return SUCCESS;
 }
 
@@ -488,14 +489,14 @@ static int find_all_new_devices()
 
 /*
  * Assigns an address to a new device on the network.
- * Returns the address (positive number) on success.
+ * Also adds the berry to the network list and notifies the host.
+ * Returns the (positive) device number on success.
  * Returns negative error code when there are no available addresses.
  * Returns 0 if there was no new device.
  */
 static int find_new_device()
 {
 	uint8_t addr;
-	int error;
 	addr = get_available_address();
 	if (addr == 0)
 	{
@@ -508,10 +509,7 @@ static int find_new_device()
 		if (ping_berry(addr) == SUCCESS)
 		{
 			// The berry responded. Add it to the list and return.
-			if (error = add_berry(addr))
-				return error;
-			else
-				return addr;
+			return add_berry(addr);
 		}
 	}
 
@@ -519,13 +517,25 @@ static int find_new_device()
 }
 
 /*
+ * Pick the next i2c address. Rather than assign them contiguously, we
+ * assign them with a difference of primes (we start with 7, increment
+ * by 11). Every possible address (1-127) will be used before repeating.
+ */
+static inline void increment_next_i2c_addr(uint8_t *next_i2c_addr)
+{
+	*next_i2c_addr += 11;
+	if (*next_i2c_addr > MAX_I2C_ADDR)
+	{
+		*next_i2c_addr -= MAX_I2C_ADDR;
+	}
+}
+
+/*
  * Return an available vine i2c address, or 0 if there are none available.
- * TODO: don't get the lowest available address. Change this (Kristian had
- * a good idea).
  */
 static uint8_t get_available_address()
 {
-	static uint8_t next_i2c_addr = 1;
+	static uint8_t next_i2c_addr = 7;
 
 	uint8_t loops;
 	for (loops = 0; loops < MAX_I2C_ADDR; ++loops)
@@ -536,17 +546,14 @@ static uint8_t get_available_address()
 		if (used_i2c_addresses[index] & bit)
 		{
 			// This i2c address has been used, pick another one.
-			++next_i2c_addr;
-			if (next_i2c_addr == MAX_I2C_ADDR)
-			{
-				next_i2c_addr = 1;
-			}
+			increment_next_i2c_addr(&next_i2c_addr);
 		}
 		else
 		{
-			// Return a valid and unused i2c address.
-			// For optimization's sake, increment the next_i2c_addr.
-			return next_i2c_addr++;
+			// Calculate next i2c address and return the old, unused one.
+			uint8_t ret_i2c_addr = next_i2c_addr;
+			increment_next_i2c_addr(&next_i2c_addr);
+			return ret_i2c_addr;
 		}
 	}
 
