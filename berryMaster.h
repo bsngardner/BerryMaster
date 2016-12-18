@@ -117,7 +117,6 @@ int get_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,
 int set_device_multi_values(uint8_t addr, int8_t reg, uint8_t* buff,
 		uint8_t count);
 int enable_interrupt(uint8_t addr, uint8_t int_type);
-int get_connected_berries(uint8_t *buff);
 void vine_interrupt_event();
 void hot_swap_event();
 

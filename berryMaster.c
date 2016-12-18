@@ -23,8 +23,8 @@
 
 #define MAX_NUM_DEVICES 32u
 #define MAX_I2C_ADDR	127
-#define INT_EN_REG 		-4
-#define INT_REG 		-5
+#define INT_EN_REG 		-9
+#define INT_REG 		-10
 
 /******************************************************************************
  Variables ********************************************************************
@@ -46,7 +46,7 @@ static uint8_t num_connected_berries = 0;
 
 // Bit array - each bit represents whether or not the associated i2c address
 // is taken or not.
-static uint8_t used_i2c_addresses[MAX_NUM_DEVICES/8];
+static uint8_t used_i2c_addresses[(MAX_I2C_ADDR+1)/8];
 
 // Self-explanatory
 static uint8_t hot_swapping_enabled = FALSE;
@@ -59,7 +59,7 @@ static int is_valid_dev_num(uint8_t addr);
 static int find_all_new_devices();
 static int find_new_device();
 static uint8_t get_available_address();
-static int add_berry(uint8_t addr);
+static int add_berry(uint8_t i2c_addr);
 static int remove_berry(uint8_t device_number);
 static int ping_berry(uint8_t i2c_addr);
 
@@ -149,49 +149,6 @@ int enable_interrupt(uint8_t dev_num, uint8_t int_type)
 	return SUCCESS;
 }
 
-/*
- * Returns a list of the connected berries in the following format:
- * Number of berries, list of device numbers from least to greatest
- *
- * e.g. [5, 0, 1, 2, 3, 4] => 5 berries, device numbers ranging from 0 to 4.
- *
- * Although device numbers are assigned from least to greatest, there is no
- * guarantee that they will be contiguous, because when a berry is unplugged,
- * the device numbers are not reassigned.
- *
- * This function dynamically allocates memory for the buffer.
- * The caller must free the memory.
- */
-int get_connected_berries(uint8_t *buff)
-{
-	// Allocate an additional byte for the number of connected berries.
-	buff = (uint8_t*) malloc(num_connected_berries+1);
-
-	// Assemble the packet:
-
-	buff[0] = num_connected_berries;
-	int i;
-	uint8_t dev_num = 0;
-	for (i = 1; i <= num_connected_berries; i++)
-	{
-		// Because device numbers aren't necessarily contiguous, search for
-		// the next device number.
-		while (berry_list[dev_num].i2c_addr == 0)
-		{
-			++dev_num;
-			// If there is an error here, it is an internal bug.
-			if (dev_num >= MAX_NUM_DEVICES)
-			{
-				send_log_msg("Error in get_connected_berries", error_msg);
-				return GET_ALL_BERRIES_ERR;
-			}
-		}
-		buff[i] = dev_num;
-		++dev_num;
-	}
-	return SUCCESS;
-}
-
 /******************************************************************************
  Master functions *************************************************************
  *****************************************************************************/
@@ -261,7 +218,7 @@ void vine_interrupt_event()
  */
 void hot_swap_event()
 {
-	static uint8_t curr_device = 0;
+	static uint8_t curr_device_num = 0;
 	static uint16_t num_events = 0;
 
 	if (!hot_swapping_enabled)
@@ -271,6 +228,9 @@ void hot_swap_event()
 	// Every 4th call, check for a new device.
 	if ((num_events & 3) == 0)
 	{
+
+//		return;
+
 		int device_number = find_new_device();
 		if (device_number < 0)
 		{
@@ -283,39 +243,23 @@ void hot_swap_event()
 	// 3 out of 4 calls, ping a device.
 	else
 	{
-		uint8_t addr = berry_list[curr_device].i2c_addr;
-		uint8_t dev_num = curr_device;
+		uint8_t addr = berry_list[curr_device_num].i2c_addr;
 
-		// Loop until (1) we've found a berry (nonzero i2c address), or
-		// (2) we've looped through every device (we don't want an infinite loop).
-		// If (2) happens, then there are no berries connected.
-		while ((addr == 0) && ((dev_num + 1) != curr_device))
+		// Ping if it's a berry.
+		if (addr != 0)
 		{
-			++dev_num;
-			if (dev_num > MAX_NUM_DEVICES)
+			if (ping_berry(addr) != SUCCESS)
 			{
-				dev_num = 0;
+				// No answer - delete the berry and notify the host.
+				remove_berry(curr_device_num);
 			}
-			addr = berry_list[dev_num].i2c_addr;
-		}
-		curr_device = dev_num;
-
-		// Return if we didn't find a berry.
-		if (addr == 0)
-			return;
-
-		// Otherwise, ping the berry.
-		if (hal_pingDevice(curr_device) != SUCCESS)
-		{
-			// No answer - delete the berry and notify the host.
-			remove_berry(curr_device);
 		}
 
 		// Next device index
-		++curr_device;
-		if (curr_device > MAX_NUM_DEVICES)
+		++curr_device_num;
+		if (curr_device_num > MAX_NUM_DEVICES)
 		{
-			curr_device = 1;
+			curr_device_num = 0;
 		}
 	}
 
@@ -393,26 +337,26 @@ static int is_valid_dev_num(uint8_t dev_num)
 
 /*
  * Add a berry to the list and notify the host.
- * Parameter addr is its i2c address.
+ * Parameter i2c_addr is its i2c address.
  * We need to give it a device number (its index in the list). Find an index
  * where the i2c address is zero - that entry is empty, so we can add it there.
  * Return the positive device number if the berry was added,
  * a negative error code otherwise.
  */
-static int add_berry(uint8_t addr)
+static int add_berry(uint8_t i2c_addr)
 {
 	uint8_t device_number;
 	for (device_number = 0; device_number < MAX_NUM_DEVICES; device_number++)
 	{
 		if (berry_list[device_number].i2c_addr == 0)
 		{
-			berry_list[device_number].i2c_addr = addr;
+			berry_list[device_number].i2c_addr = i2c_addr;
 			berry_list[device_number].int_en = 0;
 			++num_connected_berries;
 
 			// Add the address to the used i2c addresses.
-			uint8_t index = addr >> 3;			// /8
-			uint8_t bit = 1 << (addr & 0xff);	// %8
+			uint8_t index = i2c_addr >> 3;			// /8
+			uint8_t bit = 1 << (i2c_addr & 0x07);	// %8
 			used_i2c_addresses[index] |= bit;
 
 			// Notify the host of the new berry.
@@ -443,7 +387,7 @@ static int remove_berry(uint8_t device_number)
 
 	// Remove the address from the used i2c addresses list.
 	uint8_t index = addr >> 3;			// /8
-	uint8_t bit = 1 << (addr & 0xff);	// %8
+	uint8_t bit = 1 << (addr & 0x07);	// %8
 	used_i2c_addresses[index] &= ~bit;
 
 	// Remove the berry from the list.
@@ -497,6 +441,7 @@ static int find_all_new_devices()
 static int find_new_device()
 {
 	uint8_t addr;
+//	return 0;
 	addr = get_available_address();
 	if (addr == 0)
 	{
@@ -521,7 +466,7 @@ static int find_new_device()
  * assign them with a difference of primes (we start with 7, increment
  * by 11). Every possible address (1-127) will be used before repeating.
  */
-static inline void increment_next_i2c_addr(uint8_t *next_i2c_addr)
+static void increment_next_i2c_addr(uint8_t *next_i2c_addr)
 {
 	*next_i2c_addr += 11;
 	if (*next_i2c_addr > MAX_I2C_ADDR)
@@ -536,13 +481,14 @@ static inline void increment_next_i2c_addr(uint8_t *next_i2c_addr)
 static uint8_t get_available_address()
 {
 	static uint8_t next_i2c_addr = 7;
+//	return next_i2c_addr;
 
 	uint8_t loops;
 	for (loops = 0; loops < MAX_I2C_ADDR; ++loops)
 	{
 		// Check if we've already used the next_i2c_addr.
 		uint8_t index = next_i2c_addr >> 3;			// /8
-		uint8_t bit = 1 << (next_i2c_addr & 0xff);	// %8
+		uint8_t bit = 1 << (next_i2c_addr & 0x07);	// %8
 		if (used_i2c_addresses[index] & bit)
 		{
 			// This i2c address has been used, pick another one.
@@ -550,13 +496,13 @@ static uint8_t get_available_address()
 		}
 		else
 		{
-			// Calculate next i2c address and return the old, unused one.
-			uint8_t ret_i2c_addr = next_i2c_addr;
-			increment_next_i2c_addr(&next_i2c_addr);
-			return ret_i2c_addr;
+			return next_i2c_addr;
 		}
 	}
 
 	// There are no more valid i2c addresses.
+	// TODO: When this happens, we want to make sure that this function isn't
+	// called over and over again by hot_swap_event(); this function might
+	// eat up all the processor time.
 	return 0;
 }

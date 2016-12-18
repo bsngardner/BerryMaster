@@ -49,7 +49,7 @@
 #define WDT_250MS (WDTIS2_L | WDTIS0_L)
 #define WDT_1S (WDTIS2_L)
 #define WDT_16S (WDTIS1_L | WDTIS0_L)
-#define PET_WATCHDOG (WDTCTL = WDTPW | WDTSSEL0 | WDTCNTCL | WDT_16S | WDTHOLD)
+#define PET_WATCHDOG //(WDTCTL = WDTPW | WDTSSEL0 | WDTCNTCL | WDT_16S | WDTHOLD)
 
 // Global variables
 static volatile int heartbeat_cnt; // when 0, trigger heartbeat event
@@ -149,15 +149,6 @@ void eventsLoop()
 			usb_in_event();
 		}
 
-		// Ready to service a pending request from the host:
-		else if (sys_event & SERVER_EVENT)
-		{
-			server_event();
-			// Clear event if there's no pending message
-			if (server_buffer->count == 0)
-				sys_event &= ~SERVER_EVENT;
-		}
-
 		// Radio
 		else if (sys_event & NRF_EVENT)
 		{
@@ -168,6 +159,15 @@ void eventsLoop()
 				sys_event |= NRF_EVENT;
 			else
 				LED1_OFF;
+		}
+
+		// Ready to service a pending request from the host:
+		else if (sys_event & SERVER_EVENT)
+		{
+			server_event();
+			// Clear event if there's no pending message
+			if (server_buffer->count == 0)
+				sys_event &= ~SERVER_EVENT;
 		}
 
 		// Berry interrupt on the vine

@@ -35,7 +35,6 @@ static int isValidMessage();
 static void rpc_initDevices();
 static void rpc_getDeviceMultiValues();
 static void rpc_setDeviceMultiValues();
-static void rpc_getConnectedBerries();
 static void setReply(uint8_t replyLength, uint8_t result,
 		uint8_t* buff, uint8_t count);
 static void rpc_enableInterrupt();
@@ -72,7 +71,6 @@ static void rpc_enableInterrupt();
 #define OP_GET_MUL_VALS 1
 #define OP_SET_MUL_VALS 2
 #define OP_EN_INTERRUPT 3
-#define OP_GET_ALL_DEVS 4
 
 // ----------------------------------------------------------------------------
 // Function definitions -------------------------------------------------------
@@ -139,9 +137,6 @@ int server_event()
 	case OP_EN_INTERRUPT:
 		// Enable an interrupt on the berry
 		rpc_enableInterrupt();
-		break;
-	case OP_GET_ALL_DEVS:
-		rpc_getConnectedBerries();
 		break;
 	default:
 		break;
@@ -258,22 +253,6 @@ static void rpc_setDeviceMultiValues()
 
 	// Put reply in output buffer.
 	setReply(STD_REPLY_LENGTH, result, NULL, NULL);
-}
-
-static void rpc_getConnectedBerries()
-{
-	uint8_t *buff = NULL;
-	int8_t result;
-
-	// Make the server call.
-	result = get_connected_berries(buff);
-	uint8_t count = sizeof(buff);
-
-	// Put reply in output buffer.
-	setReply(STD_REPLY_LENGTH + count, result, buff, count);
-
-	// Free buff because it was dynamically allocated.
-	free(buff);
 }
 
 static void rpc_enableInterrupt()

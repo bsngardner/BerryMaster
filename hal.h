@@ -23,8 +23,6 @@ uint8_t hal_discoverNewDevice(uint8_t new_address);
 uint8_t hal_resetAllDevices();
 //Return 0 on ping success, 1 on ping failure
 uint8_t hal_pingDevice(uint8_t address);
-uint8_t hal_check_proj_key(uint16_t proj_key);
-uint8_t hal_update_proj_key(uint16_t proj_key);
 //Sets register (reg) on device (@address) to value (value)
 uint8_t hal_setDeviceRegister(uint8_t address, uint8_t reg, uint8_t value);
 //Sets registers, starting at reg
