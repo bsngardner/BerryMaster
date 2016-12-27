@@ -346,7 +346,7 @@ static int is_valid_dev_num(uint8_t dev_num)
 static int add_berry(uint8_t i2c_addr)
 {
 	uint8_t device_number;
-	for (device_number = 0; device_number < MAX_NUM_DEVICES; device_number++)
+	for (device_number = 1; device_number < MAX_NUM_DEVICES; device_number++)
 	{
 		if (berry_list[device_number].i2c_addr == 0)
 		{

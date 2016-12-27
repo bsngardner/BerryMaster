@@ -49,7 +49,7 @@
 #define WDT_250MS (WDTIS2_L | WDTIS0_L)
 #define WDT_1S (WDTIS2_L)
 #define WDT_16S (WDTIS1_L | WDTIS0_L)
-#define PET_WATCHDOG //(WDTCTL = WDTPW | WDTSSEL0 | WDTCNTCL | WDT_16S | WDTHOLD)
+#define PET_WATCHDOG (WDTCTL = WDTPW | WDTSSEL0 | WDTCNTCL | WDT_16S | WDTHOLD)
 
 // Global variables
 static volatile int heartbeat_cnt; // when 0, trigger heartbeat event
@@ -66,8 +66,8 @@ void events_nrf_callback();
 
 IObuffer* log_slot = 0;
 
-//#define USB_SOURCE
-#define NRF_SOURCE
+#define USB_SOURCE
+//#define NRF_SOURCE
 
 //#define DEBOUNCE_SW
 #ifdef DEBOUNCE_SW
