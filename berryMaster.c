@@ -21,7 +21,7 @@
  Macros ***********************************************************************
  *****************************************************************************/
 
-#define MAX_NUM_DEVICES 32u
+#define MAX_DEVICE_ID   33u
 #define MAX_I2C_ADDR	127
 #define INT_EN_REG 		-9
 #define INT_REG 		-10
@@ -38,7 +38,7 @@ typedef struct Berry
 } Berry_t;
 
 // Berry network. The index is the i2c address.
-static Berry_t berry_list[MAX_NUM_DEVICES] =
+static Berry_t berry_list[MAX_DEVICE_ID] =
 { 0 };
 
 // Self-explanatory
@@ -173,7 +173,7 @@ void vine_interrupt_event()
 	{
 		// Next index
 		++i;
-		if (i >= MAX_NUM_DEVICES)
+		if (i >= MAX_DEVICE_ID)
 			i = 0;
 
 		// Only read the berry's interrupt register if interrupts are enabled
@@ -204,7 +204,7 @@ void vine_interrupt_event()
 		// If we've checked every berry and the interrupt line is still
 		// asserted, there might be a problem.
 		++loops;
-		if (loops >= MAX_NUM_DEVICES)
+		if (loops >= MAX_DEVICE_ID)
 		{
 			send_log_msg("vine intr still asserted", warning_msg);
 			return;
@@ -257,7 +257,7 @@ void hot_swap_event()
 
 		// Next device index
 		++curr_device_num;
-		if (curr_device_num > MAX_NUM_DEVICES)
+		if (curr_device_num >= MAX_DEVICE_ID)
 		{
 			curr_device_num = 0;
 		}
@@ -321,7 +321,7 @@ static void reset_network()
  */
 static int is_valid_dev_num(uint8_t dev_num)
 {
-	if (dev_num > MAX_NUM_DEVICES)
+	if (dev_num > MAX_DEVICE_ID)
 	{
 		return INVALID_ADDR;
 	}
@@ -346,7 +346,7 @@ static int is_valid_dev_num(uint8_t dev_num)
 static int add_berry(uint8_t i2c_addr)
 {
 	uint8_t device_number;
-	for (device_number = 1; device_number < MAX_NUM_DEVICES; device_number++)
+	for (device_number = 1; device_number < MAX_DEVICE_ID; device_number++)
 	{
 		if (berry_list[device_number].i2c_addr == 0)
 		{
