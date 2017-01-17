@@ -67,7 +67,9 @@ void events_nrf_callback();
 IObuffer* log_slot = 0;
 
 //#define USB_SOURCE
+#ifndef USB_SOURCE
 #define NRF_SOURCE
+#endif
 
 //#define DEBOUNCE_SW
 #ifdef DEBOUNCE_SW
